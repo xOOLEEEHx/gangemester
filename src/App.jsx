@@ -265,38 +265,33 @@ function randomWrongAnswer(correct) {
   return Math.max(0, candidate);
 }
 
-function makeQuestion(mode = "multiplication") {
-  if (mode === "division") {
-    const divisor = Math.floor(Math.random() * 10) + 1;
-const answer = Math.floor(Math.random() * 10) + 1;
-    const dividend = divisor * answer;
-    const correct = answer;
+function randomDivisionWrongAnswer(correct) {
+  let candidate = correct;
 
-    const wrongs = new Set();
-    while (wrongs.size < 3) {
-      const candidate = randomWrongAnswer(correct);
-      if (candidate !== correct) wrongs.add(candidate);
-    }
-
-    return {
-      mode: "division",
-      a: dividend,
-      b: divisor,
-      symbol: "÷",
-      correct,
-      options: shuffle([correct, ...wrongs]),
-    };
+  while (candidate === correct) {
+    candidate = Math.floor(Math.random() * 10) + 1;
   }
 
-  const a = Math.floor(Math.random() * 11);
-  const b = Math.floor(Math.random() * 11);
-  const correct = a * b;
+  return candidate;
+}
 
+function makeOptions(correct, mode) {
   const wrongs = new Set();
+
   while (wrongs.size < 3) {
-    const candidate = randomWrongAnswer(correct);
+    const candidate =
+      mode === "division"
+        ? randomDivisionWrongAnswer(correct)
+        : randomWrongAnswer(correct);
+
     if (candidate !== correct) wrongs.add(candidate);
   }
+
+  return shuffle([correct, ...wrongs]);
+}
+
+function makeMultiplicationQuestion(a, b) {
+  const correct = a * b;
 
   return {
     mode: "multiplication",
@@ -304,8 +299,49 @@ const answer = Math.floor(Math.random() * 10) + 1;
     b,
     symbol: "×",
     correct,
-    options: shuffle([correct, ...wrongs]),
+    options: makeOptions(correct, "multiplication"),
   };
+}
+
+function makeDivisionQuestion(divisor, answer) {
+  const dividend = divisor * answer;
+  const correct = answer;
+
+  return {
+    mode: "division",
+    a: dividend,
+    b: divisor,
+    symbol: "÷",
+    correct,
+    options: makeOptions(correct, "division"),
+  };
+}
+
+function createQuestionDeck(mode = "multiplication") {
+  const questions = [];
+
+  if (mode === "division") {
+    for (let divisor = 1; divisor <= 10; divisor += 1) {
+      for (let answer = 1; answer <= 10; answer += 1) {
+        questions.push(makeDivisionQuestion(divisor, answer));
+      }
+    }
+
+    return shuffle(questions);
+  }
+
+  for (let a = 0; a <= 10; a += 1) {
+    for (let b = 0; b <= 10; b += 1) {
+      questions.push(makeMultiplicationQuestion(a, b));
+    }
+  }
+
+  return shuffle(questions);
+}
+
+function makeQuestion(mode = "multiplication") {
+  const deck = createQuestionDeck(mode);
+  return deck[0];
 }
 
 function getStars(score) {
@@ -430,6 +466,7 @@ export default function App() {
   const [adminMessage, setAdminMessage] = useState("");
   const [scoreMessage, setScoreMessage] = useState("");
   const savedThisRound = useRef(false);
+  const questionDeck = useRef([]);
 
   const trimmedName = playerName.trim();
   const stars = useMemo(() => getStars(score), [score]);
@@ -463,6 +500,14 @@ export default function App() {
     }
   }
 
+  function getNextQuestion(mode = gameMode) {
+    if (questionDeck.current.length === 0) {
+      questionDeck.current = createQuestionDeck(mode);
+    }
+
+    return questionDeck.current.pop();
+  }
+
   function startGame() {
     const validationMessage = validatePlayerName(trimmedName);
 
@@ -473,9 +518,10 @@ export default function App() {
 
     setNameError("");
     savedThisRound.current = false;
+    questionDeck.current = createQuestionDeck(gameMode);
     setScore(0);
     setTimeLeft(GAME_SECONDS);
-    setQuestion(makeQuestion(gameMode));
+    setQuestion(getNextQuestion(gameMode));
     setFeedback(null);
     setScreen("play");
   }
@@ -509,7 +555,7 @@ export default function App() {
     }
 
     setTimeout(() => {
-      setQuestion(makeQuestion(gameMode));
+      setQuestion(getNextQuestion(gameMode));
       setFeedback(null);
     }, 450);
   }
