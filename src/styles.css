@@ -1,0 +1,551 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color: #0f172a;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #eff6ff;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.app-shell {
+  min-height: 100vh;
+  width: 100%;
+  background: linear-gradient(135deg, #f0f9ff, #dbeafe, #e0e7ff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  user-select: none;
+}
+
+.phone-frame {
+  position: relative;
+  width: 100%;
+  max-width: 430px;
+  min-height: 760px;
+  background: #f8fafc;
+  border-radius: 32px;
+  box-shadow: 0 28px 70px rgb(15 23 42 / 0.24);
+  border: 1px solid white;
+  overflow: hidden;
+}
+
+.content {
+  position: relative;
+  z-index: 2;
+  padding: 28px;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.blob-one {
+  width: 290px;
+  height: 290px;
+  background: rgb(59 130 246 / 0.2);
+  left: -90px;
+  top: -105px;
+}
+
+.blob-two {
+  width: 220px;
+  height: 220px;
+  background: rgb(103 232 249 / 0.25);
+  right: -90px;
+  top: 45px;
+}
+
+.hero {
+  text-align: center;
+  padding-top: 44px;
+}
+
+.hero.compact {
+  padding-top: 28px;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 48px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: -0.05em;
+}
+
+.hero p {
+  margin: 16px auto 0;
+  max-width: 330px;
+  font-size: 18px;
+  line-height: 1.45;
+  font-weight: 750;
+  color: #64748b;
+}
+
+.icon-box {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 24px;
+  box-shadow: 0 18px 35px rgb(37 99 235 / 0.25);
+}
+
+.icon-box svg {
+  width: 44px;
+  height: 44px;
+  color: white;
+}
+
+.icon-blue {
+  background: #2563eb;
+}
+
+.icon-yellow {
+  background: #facc15;
+}
+
+.icon-red {
+  background: #e11d48;
+}
+
+.card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 32px;
+  box-shadow: 0 18px 40px rgb(15 23 42 / 0.1);
+}
+
+.input-card {
+  margin-top: 40px;
+  padding: 24px;
+  text-align: center;
+}
+
+.input-card label {
+  display: block;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.input-card input {
+  width: 100%;
+  margin-top: 16px;
+  margin-bottom: 18px;
+  border: 2px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 18px;
+  padding: 16px 18px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 850;
+  outline: none;
+}
+
+.input-card input:focus {
+  border-color: #2563eb;
+}
+
+.button {
+  border: 0;
+  border-radius: 18px;
+  padding: 16px 20px;
+  font-weight: 950;
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 15px 30px rgb(15 23 42 / 0.14);
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+.button:active {
+  transform: scale(0.98);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.button-primary {
+  background: #2563eb;
+}
+
+.button-secondary {
+  background: #7c3aed;
+}
+
+.button-danger {
+  background: #e11d48;
+}
+
+.button-light {
+  background: white;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+}
+
+.full {
+  width: 100%;
+}
+
+.top-space {
+  margin-top: 24px;
+}
+
+.small-note {
+  margin: 34px auto 0;
+  max-width: 330px;
+  color: #64748b;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+}
+
+.status-pill {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border-radius: 18px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  padding: 13px 10px;
+  box-shadow: 0 10px 20px rgb(15 23 42 / 0.08);
+  font-weight: 950;
+}
+
+.status-pill svg {
+  width: 22px;
+  height: 22px;
+}
+
+.status-pill.red {
+  color: #e11d48;
+}
+
+.status-pill.green {
+  color: #059669;
+}
+
+.question-card {
+  margin-top: 48px;
+  padding: 34px 20px;
+  text-align: center;
+}
+
+.label {
+  margin: 0;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.question-card h2 {
+  margin: 30px 0 0;
+  font-size: 64px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: -0.05em;
+}
+
+.answer-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 34px;
+}
+
+.answer-button {
+  border: 0;
+  border-radius: 26px;
+  background: #2563eb;
+  color: white;
+  padding: 28px 10px;
+  font-size: 38px;
+  line-height: 1;
+  font-weight: 950;
+  box-shadow: 0 16px 32px rgb(37 99 235 / 0.22);
+  cursor: pointer;
+}
+
+.answer-button:active {
+  transform: scale(0.96);
+}
+
+.answer-button:disabled {
+  cursor: not-allowed;
+}
+
+.answer-button.correct {
+  background: #059669;
+}
+
+.answer-button.wrong {
+  background: #e11d48;
+}
+
+.feedback-area {
+  min-height: 54px;
+  margin-top: 24px;
+  text-align: center;
+}
+
+.feedback {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 950;
+}
+
+.correct-text {
+  color: #059669;
+}
+
+.wrong-text {
+  color: #e11d48;
+}
+
+.neutral-text {
+  color: #64748b;
+  font-size: 18px;
+}
+
+.result-card {
+  margin-top: 36px;
+  padding: 30px;
+  text-align: center;
+}
+
+.result-card p,
+.result-card span {
+  margin: 0;
+  color: #64748b;
+  font-size: 20px;
+  font-weight: 850;
+}
+
+.result-card strong {
+  display: block;
+  margin-top: 6px;
+  color: #059669;
+  font-size: 70px;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.result-card h2 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 950;
+}
+
+.stars {
+  margin: 18px 0;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.star-icon {
+  width: 38px;
+  height: 38px;
+  color: #facc15;
+  fill: #facc15;
+  filter: drop-shadow(0 4px 8px rgb(250 204 21 / 0.35));
+}
+
+.stack {
+  display: grid;
+  gap: 14px;
+  margin-top: 30px;
+}
+
+.highscore-card {
+  margin-top: 28px;
+  padding: 18px;
+  min-height: 330px;
+}
+
+.empty-state {
+  padding: 80px 10px;
+  text-align: center;
+}
+
+.empty-state h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 950;
+}
+
+.empty-state p {
+  color: #64748b;
+}
+
+.score-list {
+  display: grid;
+  gap: 10px;
+}
+
+.score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 12px 14px;
+}
+
+.score-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.score-name strong {
+  font-size: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rank {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 950;
+}
+
+.rank-first {
+  background: #facc15;
+  color: white;
+}
+
+.score-value {
+  color: #059669;
+  font-size: 21px;
+  font-weight: 950;
+}
+
+.admin-message,
+.error-box {
+  margin: 16px 0 0;
+  border-radius: 16px;
+  padding: 12px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.error-box {
+  margin-top: 18px;
+  background: #fff1f2;
+  color: #be123c;
+}
+
+@media (min-width: 768px) {
+  .phone-frame {
+    max-width: 720px;
+    min-height: 820px;
+  }
+
+  .content {
+    padding: 44px 56px;
+  }
+
+  .hero h1 {
+    font-size: 64px;
+  }
+
+  .hero p {
+    max-width: 520px;
+    font-size: 22px;
+  }
+
+  .question-card h2 {
+    font-size: 82px;
+  }
+
+  .answer-grid {
+    gap: 20px;
+  }
+
+  .answer-button {
+    padding: 40px 10px;
+    font-size: 56px;
+  }
+
+  .button {
+    padding: 20px 24px;
+    font-size: 18px;
+  }
+
+  .status-pill {
+    padding: 18px 14px;
+    font-size: 20px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .app-shell {
+    align-items: flex-start;
+  }
+
+  .phone-frame {
+    min-height: auto;
+  }
+
+  .content {
+    padding: 20px;
+  }
+
+  .hero {
+    padding-top: 10px;
+  }
+
+  .question-card {
+    margin-top: 22px;
+    padding: 24px;
+  }
+
+  .answer-button {
+    padding: 22px 10px;
+  }
+}
