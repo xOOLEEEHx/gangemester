@@ -8,6 +8,7 @@ const STORAGE_KEY = "gangemester_highscores_v1";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 const ADMIN_PIN_FALLBACK = import.meta.env.VITE_ADMIN_PIN_FALLBACK || "1992";
+const APP_URL = "https://regnemester.vercel.app/";
 const BLOCKED_CONTAINS = [
   // Norske banneord / grovt språk
   "faen",
@@ -483,6 +484,18 @@ function StarsDisplay({ count }) {
   );
 }
 
+function QrCodeImage() {
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(APP_URL)}`;
+
+  return (
+    <img
+      src={qrUrl}
+      alt="QR-kode til Regnemester"
+      style={{ width: "260px", height: "260px", maxWidth: "100%", borderRadius: "18px" }}
+    />
+  );
+}
+
 export default function App() {
   const [screen, setScreen] = useState("mode");
   const [gameMode, setGameMode] = useState("multiplication");
@@ -667,7 +680,34 @@ export default function App() {
           </Button>
         </div>
 
+        <Button variant="light" onClick={() => setScreen("qr")} className="full top-space">
+          Vis QR-kode
+        </Button>
+
         <p className="small-note">Velg regneart før du starter spillet.</p>
+      </Shell>
+    );
+  }
+
+  if (screen === "qr") {
+    return (
+      <Shell>
+        <div className="hero compact">
+          <div className="icon-box icon-yellow">
+            <Zap />
+          </div>
+          <h1>QR-kode</h1>
+          <p>Skann for å åpne Regnemester.</p>
+        </div>
+
+        <div className="card input-card" style={{ alignItems: "center", textAlign: "center" }}>
+          <QrCodeImage />
+          <p className="small-note">{APP_URL}</p>
+        </div>
+
+        <Button variant="light" onClick={() => setScreen("mode")} className="full top-space">
+          Tilbake
+        </Button>
       </Shell>
     );
   }
