@@ -8,7 +8,237 @@ const STORAGE_KEY = "gangemester_highscores_v1";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 const ADMIN_PIN_FALLBACK = import.meta.env.VITE_ADMIN_PIN_FALLBACK || "1992";
+const BLOCKED_CONTAINS = [
+  // Norske banneord / grovt språk
+  "faen",
+  "faan",
+  "fanden",
+  "satan",
+  "satans",
+  "helvete",
+  "hælvete",
+  "haelvete",
+  "jævel",
+  "javel",
+  "jævla",
+  "javla",
+  "jævlig",
+  "javlig",
+  "dritt",
+  "drit",
+  "driten",
+  "drittsekk",
+  "shit",
+  "sh1t",
 
+  // Kropp, doord og typisk barneskole-tulling
+  "bæsj",
+  "baesj",
+  "bajs",
+  "tiss",
+  "piss",
+  "promp",
+  "fjesing",
+  "ræv",
+  "raev",
+  "rompe",
+  "rumpe",
+
+  // Norske fornærmelser / mobbeord
+  "idiot",
+  "dust",
+  "dumming",
+  "taper",
+  "loser",
+  "mongo",
+  "retard",
+  "teit",
+  "stygg",
+  "styggen",
+  "feit",
+  "fett",
+  "dum",
+  "hater",
+  "mobber",
+  "slem",
+  "ekkel",
+  "ekkelt",
+  "creep",
+
+  // Seksuelle ord / ikke barnevennlig
+  "sex",
+  "sexy",
+  "porno",
+  "porn",
+  "naken",
+  "nude",
+  "penis",
+  "pikk",
+  "p1kk",
+  "kuk",
+  "kukk",
+  "fitte",
+  "f1tte",
+  "vagina",
+  "pupp",
+  "pupper",
+  "boobs",
+  "boob",
+  "tits",
+  "hore",
+  "h0re",
+  "slut",
+  "dildo",
+  "sug",
+  "suge",
+  "suger",
+  "blowjob",
+  "handjob",
+  "cum",
+  "cumming",
+  "orgasme",
+
+  // Engelske banneord / grove ord
+  "fuck",
+  "fck",
+  "fuk",
+  "fucker",
+  "fucking",
+  "motherfucker",
+  "bitch",
+  "btch",
+  "asshole",
+  "bastard",
+  "damn",
+  "crap",
+  "dick",
+  "cock",
+  "pussy",
+  "whore",
+
+  // Vold / trusler / mørkt innhold
+  "kill",
+  "killer",
+  "killing",
+  "drep",
+  "drepe",
+  "dreper",
+  "mord",
+  "morder",
+  "myrd",
+  "death",
+  "die",
+  "dead",
+  "blod",
+  "blood",
+  "kniv",
+  "knife",
+  "gun",
+  "guns",
+  "våpen",
+  "vapen",
+  "bomb",
+  "bombe",
+  "skyte",
+  "skyt",
+  "shoot",
+
+  // Hat, ekstremisme og uønskede navn i skolebruk
+  "nazi",
+  "nazist",
+  "hitler",
+  "rasist",
+  "racist",
+  "terror",
+  "terrorist",
+  "isis",
+  "kkk",
+
+  // Rus / alkohol
+  "øl",
+  "alkohol",
+  "drunk",
+  "vodka",
+  "beer",
+  "dop",
+  "drug",
+  "drugs",
+  "weed",
+  "hasj",
+  "hash",
+  "røyk",
+  "royk",
+  "snus",
+  "vape"
+];
+
+const BLOCKED_EXACT = [
+  // Ord som kan gi rare treff hvis de bare søkes som deler av andre ord
+  "ass",
+  "tit",
+  "poo",
+  "pee",
+  "die",
+  "dum",
+  "slem",
+  "stygg",
+  "feit",
+  "teit"
+];
+
+function normalizeNameForCheck(name) {
+  return name
+    .toLowerCase()
+    .replaceAll("æ", "ae")
+    .replaceAll("ø", "o")
+    .replaceAll("å", "a")
+    .replaceAll("0", "o")
+    .replaceAll("1", "i")
+    .replaceAll("!", "i")
+    .replaceAll("3", "e")
+    .replaceAll("4", "a")
+    .replaceAll("@", "a")
+    .replaceAll("5", "s")
+    .replaceAll("$", "s")
+    .replaceAll("7", "t")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function validatePlayerName(name) {
+  const cleanName = name.trim();
+
+  if (cleanName.length < 3) {
+    return "Spillnavnet må ha minst 3 tegn.";
+  }
+
+  if (cleanName.length > 18) {
+    return "Spillnavnet kan maks ha 18 tegn.";
+  }
+
+  if (!/^[a-zA-ZæøåÆØÅ0-9-]+$/.test(cleanName)) {
+    return "Bruk bare bokstaver, tall eller bindestrek.";
+  }
+
+  if (/^\d+$/.test(cleanName)) {
+    return "Spillnavnet kan ikke bare være tall.";
+  }
+
+  const normalized = normalizeNameForCheck(cleanName);
+
+  const hasBlockedContainsWord = BLOCKED_CONTAINS.some((word) =>
+    normalized.includes(normalizeNameForCheck(word))
+  );
+
+  const hasBlockedExactWord = BLOCKED_EXACT.some(
+    (word) => normalized === normalizeNameForCheck(word)
+  );
+
+  if (hasBlockedContainsWord || hasBlockedExactWord) {
+    return "Velg et annet spillnavn. Bruk et hyggelig navn.";
+  }
+
+  return "";
+}
 const supabase =
   SUPABASE_URL && SUPABASE_ANON_KEY
     ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -160,6 +390,7 @@ function StarsDisplay({ count }) {
 export default function App() {
   const [screen, setScreen] = useState("start");
   const [playerName, setPlayerName] = useState("");
+  const [nameError, setNameError] = useState("");
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(GAME_SECONDS);
   const [question, setQuestion] = useState(() => makeQuestion());
@@ -203,7 +434,14 @@ export default function App() {
   }
 
   function startGame() {
-    if (!trimmedName) return;
+  const validationMessage = validatePlayerName(trimmedName);
+
+  if (validationMessage) {
+    setNameError(validationMessage);
+    return;
+  }
+
+  setNameError("");
 
     savedThisRound.current = false;
     setScore(0);
@@ -281,6 +519,9 @@ export default function App() {
             placeholder="f.eks. Tiger23"
             autoComplete="off"
           />
+
+          {nameError && <p className="admin-message">{nameError}</p>}
+          
           <Button onClick={startGame} disabled={!trimmedName} className="full">
             Start spillet
           </Button>
