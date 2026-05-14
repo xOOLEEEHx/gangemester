@@ -419,9 +419,13 @@ async function saveScore(entry) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify([...current, entry]));
 }
 
-async function clearScores(adminPin) {
+async function clearScores(adminPin, resetMode = "all") {
   if (supabase) {
-    const { error } = await supabase.rpc("reset_scores", { admin_pin: adminPin });
+    const { error } = await supabase.rpc("reset_scores_by_mode", {
+      admin_pin: adminPin,
+      reset_mode: resetMode,
+    });
+
     if (error) throw new Error(error.message || "Kunne ikke nullstille listen.");
     return;
   }
@@ -430,7 +434,19 @@ async function clearScores(adminPin) {
     throw new Error("Feil PIN. Prøv igjen.");
   }
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+  const raw = localStorage.getItem(STORAGE_KEY);
+  const current = raw ? JSON.parse(raw) : [];
+
+  if (resetMode === "all") {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+    return;
+  }
+
+  const remainingScores = current.filter(
+    (entry) => (entry.mode || "multiplication") !== resetMode
+  );
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(remainingScores));
 }
 
 function Button({ children, onClick, variant = "primary", disabled = false, className = "" }) {
@@ -479,6 +495,7 @@ export default function App() {
   const [feedback, setFeedback] = useState(null);
   const [scores, setScores] = useState([]);
   const [pin, setPin] = useState("");
+  const [adminResetMode, setAdminResetMode] = useState("all");
   const [adminMessage, setAdminMessage] = useState("");
   const [scoreMessage, setScoreMessage] = useState("");
   const savedThisRound = useRef(false);
@@ -596,10 +613,21 @@ export default function App() {
     setAdminMessage("");
 
     try {
-      await clearScores(pin);
-      setScores([]);
+      await clearScores(pin, adminResetMode);
       setPin("");
-      setAdminMessage("Highscore-listen er nullstilt.");
+
+      if (adminResetMode === "all" || adminResetMode === highscoreMode) {
+        setScores([]);
+      } else {
+        await refreshScores(highscoreMode);
+      }
+
+      const resetText =
+        adminResetMode === "all"
+          ? "alle highscore-lister"
+          : `${getModeLabel(adminResetMode).toLowerCase()}-listen`;
+
+      setAdminMessage(`Nullstilte ${resetText}.`);
     } catch (error) {
       setAdminMessage(error.message);
     }
@@ -846,7 +874,33 @@ export default function App() {
       </div>
 
       <div className="card input-card">
-        <label htmlFor="admin-pin">Skriv PIN</label>
+        <label>Hva vil du nullstille?</label>
+
+        <Button
+          variant={adminResetMode === "multiplication" ? "primary" : "light"}
+          onClick={() => setAdminResetMode("multiplication")}
+          className="full"
+        >
+          Multiplikasjon
+        </Button>
+
+        <Button
+          variant={adminResetMode === "division" ? "primary" : "light"}
+          onClick={() => setAdminResetMode("division")}
+          className="full top-space"
+        >
+          Divisjon
+        </Button>
+
+        <Button
+          variant={adminResetMode === "all" ? "danger" : "light"}
+          onClick={() => setAdminResetMode("all")}
+          className="full top-space"
+        >
+          Alt
+        </Button>
+
+        <label htmlFor="admin-pin" className="top-space">Skriv PIN</label>
         <input
           id="admin-pin"
           value={pin}
