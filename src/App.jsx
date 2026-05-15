@@ -862,7 +862,7 @@ export default function App() {
         </Button>
 
         <Button variant="light" onClick={() => setScreen("grade")} className="full top-space">
-          Bytt trinn
+          Tilbake
         </Button>
 
         <p className="small-note">Velg trinn og regneart før du starter spillet.</p>
@@ -1126,7 +1126,7 @@ export default function App() {
         </div>
 
         <div className="stack">
-          <Button onClick={() => setScreen("mode")}>Spill</Button>
+          <Button onClick={() => setScreen("mode")}>Tilbake</Button>
           <Button variant="light" onClick={() => setScreen("admin")}>
             Admin
           </Button>
