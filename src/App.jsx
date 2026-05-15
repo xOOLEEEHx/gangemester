@@ -830,7 +830,7 @@ export default function App() {
     setTimeout(() => {
       setQuestion(getNextQuestion(gameMode, gameLevel));
       setFeedback(null);
-    }, 450);
+    }, 180);
   }
 
   async function validateAdminLogin() {
