@@ -2,15 +2,25 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Crown, Shield, Star, Timer, Trophy, Zap } from "lucide-react";
 
-const GAME_SECONDS = 60;
+const NORMAL_GAME_SECONDS = 60;
+const SCHOOL_BATTLE_SECONDS = 70;
 const STORAGE_KEY = "gangemester_highscores_v1";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 const ADMIN_PIN_FALLBACK = import.meta.env.VITE_ADMIN_PIN_FALLBACK || "1992";
 const APP_URL = "https://regnemester.vercel.app/";
+
+const SCHOOL_OPTIONS = [
+  "Austafjord skole",
+  "Foldereid oppvekstsenter",
+  "Gravvik oppvekstsenter",
+  "Kolvereid skole",
+  "Nærøysundet skole",
+  "Rørvik skole",
+];
+
 const BLOCKED_CONTAINS = [
-  // Norske banneord / grovt språk
   "faen",
   "faan",
   "fanden",
@@ -31,8 +41,6 @@ const BLOCKED_CONTAINS = [
   "drittsekk",
   "shit",
   "sh1t",
-
-  // Kropp, doord og typisk barneskole-tulling
   "bæsj",
   "baesj",
   "bajs",
@@ -44,8 +52,6 @@ const BLOCKED_CONTAINS = [
   "raev",
   "rompe",
   "rumpe",
-
-  // Norske fornærmelser / mobbeord
   "idiot",
   "dust",
   "dumming",
@@ -65,8 +71,6 @@ const BLOCKED_CONTAINS = [
   "ekkel",
   "ekkelt",
   "creep",
-
-  // Seksuelle ord / ikke barnevennlig
   "sex",
   "sexy",
   "porno",
@@ -98,8 +102,6 @@ const BLOCKED_CONTAINS = [
   "cum",
   "cumming",
   "orgasme",
-
-  // Engelske banneord / grove ord
   "fuck",
   "fck",
   "fuk",
@@ -116,8 +118,6 @@ const BLOCKED_CONTAINS = [
   "cock",
   "pussy",
   "whore",
-
-  // Vold / trusler / mørkt innhold
   "kill",
   "killer",
   "killing",
@@ -143,8 +143,6 @@ const BLOCKED_CONTAINS = [
   "skyte",
   "skyt",
   "shoot",
-
-  // Hat, ekstremisme og uønskede navn i skolebruk
   "nazi",
   "nazist",
   "hitler",
@@ -154,8 +152,6 @@ const BLOCKED_CONTAINS = [
   "terrorist",
   "isis",
   "kkk",
-
-  // Rus / alkohol
   "alkohol",
   "drunk",
   "vodka",
@@ -172,19 +168,7 @@ const BLOCKED_CONTAINS = [
   "vape",
 ];
 
-const BLOCKED_EXACT = [
-  // Ord som kan gi rare treff hvis de bare søkes som deler av andre ord
-  "ass",
-  "tit",
-  "poo",
-  "pee",
-  "die",
-  "dum",
-  "slem",
-  "stygg",
-  "feit",
-  "teit",
-];
+const BLOCKED_EXACT = ["ass", "tit", "poo", "pee", "die", "dum", "slem", "stygg", "feit", "teit"];
 
 function normalizeNameForCheck(name) {
   return name
@@ -207,31 +191,14 @@ function normalizeNameForCheck(name) {
 function validatePlayerName(name) {
   const cleanName = name.trim();
 
-  if (cleanName.length < 3) {
-    return "Spillnavnet må ha minst 3 tegn.";
-  }
-
-  if (cleanName.length > 18) {
-    return "Spillnavnet kan maks ha 18 tegn.";
-  }
-
-  if (!/^[a-zA-ZæøåÆØÅ0-9-]+$/.test(cleanName)) {
-    return "Bruk bare bokstaver, tall eller bindestrek.";
-  }
-
-  if (/^\d+$/.test(cleanName)) {
-    return "Spillnavnet kan ikke bare være tall.";
-  }
+  if (cleanName.length < 3) return "Spillnavnet må ha minst 3 tegn.";
+  if (cleanName.length > 18) return "Spillnavnet kan maks ha 18 tegn.";
+  if (!/^[a-zA-ZæøåÆØÅ0-9-]+$/.test(cleanName)) return "Bruk bare bokstaver, tall eller bindestrek.";
+  if (/^\d+$/.test(cleanName)) return "Spillnavnet kan ikke bare være tall.";
 
   const normalized = normalizeNameForCheck(cleanName);
-
-  const hasBlockedContainsWord = BLOCKED_CONTAINS.some((word) =>
-    normalized.includes(normalizeNameForCheck(word))
-  );
-
-  const hasBlockedExactWord = BLOCKED_EXACT.some(
-    (word) => normalized === normalizeNameForCheck(word)
-  );
+  const hasBlockedContainsWord = BLOCKED_CONTAINS.some((word) => normalized.includes(normalizeNameForCheck(word)));
+  const hasBlockedExactWord = BLOCKED_EXACT.some((word) => normalized === normalizeNameForCheck(word));
 
   if (hasBlockedContainsWord || hasBlockedExactWord) {
     return "Velg et annet spillnavn. Bruk et hyggelig navn.";
@@ -240,19 +207,14 @@ function validatePlayerName(name) {
   return "";
 }
 
-const supabase =
-  SUPABASE_URL && SUPABASE_ANON_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
+const supabase = SUPABASE_URL && SUPABASE_ANON_KEY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 function shuffle(array) {
   return [...array].sort(() => Math.random() - 0.5);
 }
 
 function randomWrongAnswer(correct) {
-  if (correct === 0) {
-    return Math.floor(Math.random() * 20) + 1;
-  }
+  if (correct === 0) return Math.floor(Math.random() * 20) + 1;
 
   const strategies = [
     correct + (Math.floor(Math.random() * 9) - 4),
@@ -283,11 +245,7 @@ function randomDivisionWrongAnswer(correct, max = 10) {
   }
 
   let candidate = correct;
-
-  while (candidate === correct) {
-    candidate = Math.floor(Math.random() * max) + 1;
-  }
-
+  while (candidate === correct) candidate = Math.floor(Math.random() * max) + 1;
   return candidate;
 }
 
@@ -295,11 +253,7 @@ function makeOptions(correct, mode, max = 10) {
   const wrongs = new Set();
 
   while (wrongs.size < 3) {
-    const candidate =
-      mode === "division"
-        ? randomDivisionWrongAnswer(correct, max)
-        : randomWrongAnswer(correct);
-
+    const candidate = mode === "division" ? randomDivisionWrongAnswer(correct, max) : randomWrongAnswer(correct);
     if (candidate !== correct) wrongs.add(candidate);
   }
 
@@ -308,29 +262,13 @@ function makeOptions(correct, mode, max = 10) {
 
 function makeMultiplicationQuestion(a, b) {
   const correct = a * b;
-
-  return {
-    mode: "multiplication",
-    a,
-    b,
-    symbol: "×",
-    correct,
-    options: makeOptions(correct, "multiplication"),
-  };
+  return { mode: "multiplication", a, b, symbol: "×", correct, options: makeOptions(correct, "multiplication") };
 }
 
 function makeDivisionQuestion(divisor, answer, max = 10) {
   const dividend = divisor * answer;
   const correct = answer;
-
-  return {
-    mode: "division",
-    a: dividend,
-    b: divisor,
-    symbol: "÷",
-    correct,
-    options: makeOptions(correct, "division", max),
-  };
+  return { mode: "division", a: dividend, b: divisor, symbol: "÷", correct, options: makeOptions(correct, "division", max) };
 }
 
 function getLevelMax(level = "medium", mode = "multiplication") {
@@ -347,11 +285,7 @@ function getLevelLabel(level) {
 
 function getLevelDescription(mode, level) {
   const max = getLevelMax(level, mode);
-
-  if (mode === "division") {
-    return `${getLevelLabel(level)}: deling med tall fra 1–${max}`;
-  }
-
+  if (mode === "division") return `${getLevelLabel(level)}: deling med tall fra 1–${max}`;
   return `${getLevelLabel(level)}: gangestykker fra 0–${max}`;
 }
 
@@ -361,18 +295,13 @@ function createQuestionDeck(mode = "multiplication", level = "medium") {
 
   if (mode === "division") {
     for (let divisor = 1; divisor <= max; divisor += 1) {
-      for (let answer = 1; answer <= max; answer += 1) {
-        questions.push(makeDivisionQuestion(divisor, answer, max));
-      }
+      for (let answer = 1; answer <= max; answer += 1) questions.push(makeDivisionQuestion(divisor, answer, max));
     }
-
     return shuffle(questions);
   }
 
   for (let a = 0; a <= max; a += 1) {
-    for (let b = 0; b <= max; b += 1) {
-      questions.push(makeMultiplicationQuestion(a, b));
-    }
+    for (let b = 0; b <= max; b += 1) questions.push(makeMultiplicationQuestion(a, b));
   }
 
   return shuffle(questions);
@@ -408,34 +337,49 @@ function getGradeLabel(gradeLevel) {
   return `${gradeLevel}. klasse`;
 }
 
+function getGameSeconds(gameType) {
+  return gameType === "school_battle" ? SCHOOL_BATTLE_SECONDS : NORMAL_GAME_SECONDS;
+}
+
 function getHighscoreTitle(mode, level, gradeLevel) {
   return `${getGradeLabel(gradeLevel)} - ${getModeLabel(mode)} - ${getLevelLabel(level)} - Topp 10`;
 }
 
 function sortScores(scores) {
   return [...scores]
-    .filter(
-      (entry) =>
-        entry &&
-        typeof entry.name === "string" &&
-        Number.isFinite(Number(entry.score))
-    )
+    .filter((entry) => entry && typeof entry.name === "string" && Number.isFinite(Number(entry.score)))
     .map((entry) => ({
       name: entry.name,
       score: Number(entry.score),
       mode: entry.mode || "multiplication",
       level: entry.level || "medium",
       grade_level: Number(entry.grade_level || 4),
+      school: entry.school || "",
     }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 10);
+}
+
+function sortSchoolBattleScores(scores) {
+  return [...scores]
+    .filter((entry) => entry && typeof entry.name === "string" && Number.isFinite(Number(entry.score)))
+    .map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      school: entry.school || "Ukjent skole",
+      score: Number(entry.score),
+      mode: entry.mode || "multiplication",
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20);
 }
 
 async function loadScores(mode = "multiplication", level = "medium", gradeLevel = 4) {
   if (supabase) {
     const { data, error } = await supabase
       .from("scores")
-      .select("name, score, mode, level, grade_level")
+      .select("name, score, mode, level, grade_level, game_type")
+      .eq("game_type", "normal")
       .eq("mode", mode)
       .eq("level", level)
       .eq("grade_level", gradeLevel)
@@ -451,12 +395,37 @@ async function loadScores(mode = "multiplication", level = "medium", gradeLevel 
     const storedScores = raw ? JSON.parse(raw) : [];
     const filteredScores = storedScores.filter(
       (entry) =>
+        (entry.game_type || "normal") === "normal" &&
         (entry.mode || "multiplication") === mode &&
         (entry.level || "medium") === level &&
         Number(entry.grade_level || 4) === Number(gradeLevel)
     );
 
     return sortScores(filteredScores);
+  } catch {
+    return [];
+  }
+}
+
+async function loadSchoolBattleScores(mode = "multiplication") {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("scores")
+      .select("id, name, score, mode, school, game_type")
+      .eq("game_type", "school_battle")
+      .eq("mode", mode)
+      .order("score", { ascending: false })
+      .limit(20);
+
+    if (!error && data) return sortSchoolBattleScores(data);
+    throw new Error(error?.message || "Kunne ikke hente Skolekampen-listen.");
+  }
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const storedScores = raw ? JSON.parse(raw) : [];
+    const filteredScores = storedScores.filter((entry) => entry.game_type === "school_battle" && entry.mode === mode);
+    return sortSchoolBattleScores(filteredScores);
   } catch {
     return [];
   }
@@ -473,20 +442,17 @@ async function saveScore(entry) {
     });
 
     if (error) throw new Error(error.message || "Kunne ikke lagre score.");
-
     const result = Array.isArray(data) ? data[0] : data;
-
-    return {
-      saved: Boolean(result?.saved),
-      message: result?.message || "Resultatet er sjekket mot highscore-listen.",
-    };
+    return { saved: Boolean(result?.saved), message: result?.message || "Resultatet er sjekket mot highscore-listen." };
   }
 
   const raw = localStorage.getItem(STORAGE_KEY);
   const current = raw ? JSON.parse(raw) : [];
+  const entryWithType = { ...entry, game_type: "normal" };
   const matchingScores = current
     .filter(
       (storedEntry) =>
+        (storedEntry.game_type || "normal") === "normal" &&
         (storedEntry.mode || "multiplication") === entry.mode &&
         (storedEntry.level || "medium") === entry.level &&
         Number(storedEntry.grade_level || 4) === Number(entry.grade_level)
@@ -496,41 +462,74 @@ async function saveScore(entry) {
   const lowestTopScore = matchingScores[9]?.score;
   const shouldSave = matchingScores.length < 10 || entry.score > Number(lowestTopScore);
 
-  if (!shouldSave) {
-    return {
-      saved: false,
-      message: `Du fikk ${entry.score} poeng. Det holdt ikke til topp 10 denne gangen.`,
-    };
-  }
+  if (!shouldSave) return { saved: false, message: "Det holdt ikke til topp 10 denne gangen." };
 
-  const updatedScores = [...current, entry];
+  const updatedScores = [...current, entryWithType];
+  const sameListScores = updatedScores
+    .filter(
+      (scoreEntry) =>
+        (scoreEntry.game_type || "normal") === "normal" &&
+        (scoreEntry.mode || "multiplication") === entry.mode &&
+        (scoreEntry.level || "medium") === entry.level &&
+        Number(scoreEntry.grade_level || 4) === Number(entry.grade_level)
+    )
+    .sort((a, b) => Number(b.score) - Number(a.score))
+    .slice(0, 10);
+
   const trimmedScores = updatedScores.filter((storedEntry) => {
     const sameList =
+      (storedEntry.game_type || "normal") === "normal" &&
       (storedEntry.mode || "multiplication") === entry.mode &&
       (storedEntry.level || "medium") === entry.level &&
       Number(storedEntry.grade_level || 4) === Number(entry.grade_level);
 
     if (!sameList) return true;
-
-    const sameListScores = updatedScores
-      .filter(
-        (scoreEntry) =>
-          (scoreEntry.mode || "multiplication") === entry.mode &&
-          (scoreEntry.level || "medium") === entry.level &&
-          Number(scoreEntry.grade_level || 4) === Number(entry.grade_level)
-      )
-      .sort((a, b) => Number(b.score) - Number(a.score))
-      .slice(0, 10);
-
     return sameListScores.includes(storedEntry);
   });
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmedScores));
+  return { saved: true, message: "Du kom på highscore-listen!" };
+}
 
-  return {
-    saved: true,
-    message: "Du kom på highscore-listen!",
-  };
+async function saveSchoolBattleScore(entry) {
+  if (supabase) {
+    const { data, error } = await supabase.rpc("save_school_battle_score", {
+      player_name: entry.name,
+      player_score: entry.score,
+      score_mode: entry.mode,
+      player_school: entry.school,
+    });
+
+    if (error) throw new Error(error.message || "Kunne ikke lagre Skolekampen-score.");
+    const result = Array.isArray(data) ? data[0] : data;
+    return { saved: Boolean(result?.saved), message: result?.message || "Resultatet er sjekket mot Skolekampen-listen." };
+  }
+
+  const raw = localStorage.getItem(STORAGE_KEY);
+  const current = raw ? JSON.parse(raw) : [];
+  const entryWithType = { ...entry, game_type: "school_battle", level: "medium", grade_level: 0 };
+  const matchingScores = current
+    .filter((storedEntry) => storedEntry.game_type === "school_battle" && storedEntry.mode === entry.mode)
+    .sort((a, b) => Number(b.score) - Number(a.score));
+
+  const lowestTopScore = matchingScores[19]?.score;
+  const shouldSave = matchingScores.length < 20 || entry.score > Number(lowestTopScore);
+
+  if (!shouldSave) return { saved: false, message: "Det holdt ikke til topp 20 i Skolekampen denne gangen." };
+
+  const updatedScores = [...current, entryWithType];
+  const sameListScores = updatedScores
+    .filter((scoreEntry) => scoreEntry.game_type === "school_battle" && scoreEntry.mode === entry.mode)
+    .sort((a, b) => Number(b.score) - Number(a.score))
+    .slice(0, 20);
+
+  const trimmedScores = updatedScores.filter((storedEntry) => {
+    if (!(storedEntry.game_type === "school_battle" && storedEntry.mode === entry.mode)) return true;
+    return sameListScores.includes(storedEntry);
+  });
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmedScores));
+  return { saved: true, message: "Du kom på Skolekampen-listen!" };
 }
 
 async function clearScores(adminPin, resetMode = "all", resetGradeLevel = 4) {
@@ -545,17 +544,16 @@ async function clearScores(adminPin, resetMode = "all", resetGradeLevel = 4) {
     return;
   }
 
-  if (adminPin !== ADMIN_PIN_FALLBACK) {
-    throw new Error("Feil PIN. Prøv igjen.");
-  }
+  if (adminPin !== ADMIN_PIN_FALLBACK) throw new Error("Feil PIN. Prøv igjen.");
 
   const raw = localStorage.getItem(STORAGE_KEY);
   const current = raw ? JSON.parse(raw) : [];
-
   const remainingScores = current.filter((entry) => {
     const entryGrade = Number(entry.grade_level || 4);
     const entryMode = entry.mode || "multiplication";
+    const entryGameType = entry.game_type || "normal";
 
+    if (entryGameType !== "normal") return true;
     if (entryGrade !== Number(resetGradeLevel)) return true;
     if (resetMode === "all") return false;
     return entryMode !== resetMode;
@@ -566,11 +564,7 @@ async function clearScores(adminPin, resetMode = "all", resetGradeLevel = 4) {
 
 function Button({ children, onClick, variant = "primary", disabled = false, className = "" }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`button button-${variant} ${className}`}
-    >
+    <button onClick={onClick} disabled={disabled} className={`button button-${variant} ${className}`}>
       {children}
     </button>
   );
@@ -600,19 +594,14 @@ function StarsDisplay({ count }) {
 
 function QrCodeImage() {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(APP_URL)}`;
-
-  return (
-    <img
-      src={qrUrl}
-      alt="QR-kode til Regnemester"
-      style={{ width: "260px", height: "260px", maxWidth: "100%", borderRadius: "18px" }}
-    />
-  );
+  return <img src={qrUrl} alt="QR-kode til Regnemester" style={{ width: "260px", height: "260px", maxWidth: "100%", borderRadius: "18px" }} />;
 }
 
 export default function App() {
-  const [screen, setScreen] = useState("grade");
+  const [screen, setScreen] = useState("home");
+  const [gameType, setGameType] = useState("normal");
   const [gameGradeLevel, setGameGradeLevel] = useState(null);
+  const [schoolBattleSchool, setSchoolBattleSchool] = useState("");
   const [gameMode, setGameMode] = useState("multiplication");
   const [gameLevel, setGameLevel] = useState("medium");
   const [highscoreGradeLevel, setHighscoreGradeLevel] = useState(4);
@@ -621,11 +610,13 @@ export default function App() {
   const [playerName, setPlayerName] = useState("");
   const [nameError, setNameError] = useState("");
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(GAME_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(NORMAL_GAME_SECONDS);
   const [question, setQuestion] = useState(() => makeQuestion("multiplication", "medium"));
   const [feedback, setFeedback] = useState(null);
   const [scores, setScores] = useState([]);
   const [pin, setPin] = useState("");
+  const [schoolDeletePin, setSchoolDeletePin] = useState("");
+  const [schoolDeleteMessage, setSchoolDeleteMessage] = useState("");
   const [adminResetMode, setAdminResetMode] = useState("all");
   const [adminMessage, setAdminMessage] = useState("");
   const [scoreMessage, setScoreMessage] = useState("");
@@ -647,16 +638,23 @@ export default function App() {
       return;
     }
 
-    const timer = setTimeout(() => {
-      setTimeLeft((current) => current - 1);
-    }, 1000);
-
+    const timer = setTimeout(() => setTimeLeft((current) => current - 1), 1000);
     return () => clearTimeout(timer);
   }, [screen, timeLeft]);
 
   async function refreshScores(mode = highscoreMode, level = highscoreLevel, gradeLevel = highscoreGradeLevel) {
     try {
       const loaded = await loadScores(mode, level, gradeLevel);
+      setScores(loaded);
+      setScoreMessage("");
+    } catch (error) {
+      setScoreMessage(error.message);
+    }
+  }
+
+  async function refreshSchoolBattleScores(mode = highscoreMode) {
+    try {
+      const loaded = await loadSchoolBattleScores(mode);
       setScores(loaded);
       setScoreMessage("");
     } catch (error) {
@@ -672,6 +670,12 @@ export default function App() {
     setScreen("highscore");
   }
 
+  function openSchoolBattleHighscore(mode = gameMode) {
+    setHighscoreMode(mode);
+    refreshSchoolBattleScores(mode);
+    setScreen("schoolHighscore");
+  }
+
   function changeHighscoreMode(mode) {
     setHighscoreMode(mode);
     refreshScores(mode, highscoreLevel, highscoreGradeLevel);
@@ -682,22 +686,18 @@ export default function App() {
     refreshScores(highscoreMode, level, highscoreGradeLevel);
   }
 
-  function changeHighscoreGradeLevel(gradeLevel) {
-    setHighscoreGradeLevel(gradeLevel);
-    refreshScores(highscoreMode, highscoreLevel, gradeLevel);
+  function changeSchoolBattleHighscoreMode(mode) {
+    setHighscoreMode(mode);
+    refreshSchoolBattleScores(mode);
   }
 
   function getNextQuestion(mode = gameMode, level = gameLevel) {
-    if (questionDeck.current.length === 0) {
-      questionDeck.current = createQuestionDeck(mode, level);
-    }
-
+    if (questionDeck.current.length === 0) questionDeck.current = createQuestionDeck(mode, level);
     return questionDeck.current.pop();
   }
 
   function startGame() {
     const validationMessage = validatePlayerName(trimmedName);
-
     if (validationMessage) {
       setNameError(validationMessage);
       return;
@@ -707,7 +707,7 @@ export default function App() {
     savedThisRound.current = false;
     questionDeck.current = createQuestionDeck(gameMode, gameLevel);
     setScore(0);
-    setTimeLeft(GAME_SECONDS);
+    setTimeLeft(getGameSeconds(gameType));
     setQuestion(getNextQuestion(gameMode, gameLevel));
     setFeedback(null);
     setScreen("play");
@@ -721,6 +721,20 @@ export default function App() {
       savedThisRound.current = true;
 
       try {
+        if (gameType === "school_battle") {
+          const saveResult = await saveSchoolBattleScore({
+            name: trimmedName.slice(0, 18),
+            score,
+            mode: gameMode,
+            school: schoolBattleSchool,
+          });
+
+          setHighscoreMode(gameMode);
+          await refreshSchoolBattleScores(gameMode);
+          setScoreMessage(`Du fikk ${score} poeng. ${saveResult.message}`);
+          return;
+        }
+
         const saveResult = await saveScore({
           name: trimmedName.slice(0, 18),
           score,
@@ -733,12 +747,7 @@ export default function App() {
         setHighscoreLevel(gameLevel);
         setHighscoreGradeLevel(gameGradeLevel);
         await refreshScores(gameMode, gameLevel, gameGradeLevel);
-
-        if (saveResult.saved) {
-          setScoreMessage(`Du fikk ${score} poeng. ${saveResult.message}`);
-        } else {
-          setScoreMessage(`Du fikk ${score} poeng. ${saveResult.message}`);
-        }
+        setScoreMessage(`Du fikk ${score} poeng. ${saveResult.message}`);
       } catch (error) {
         setScoreMessage(error.message);
       }
@@ -749,7 +758,6 @@ export default function App() {
     if (feedback) return;
 
     const isCorrect = value === question.correct;
-
     if (isCorrect) {
       setScore((current) => current + 1);
       setFeedback("correct");
@@ -764,6 +772,36 @@ export default function App() {
     }, 450);
   }
 
+  async function deleteSchoolBattleScore(scoreId) {
+    setSchoolDeleteMessage("");
+
+    if (!schoolDeletePin.trim()) {
+      setSchoolDeleteMessage("Skriv slettekode først.");
+      return;
+    }
+
+    try {
+      if (supabase) {
+        const { error } = await supabase.rpc("delete_school_battle_score", {
+          delete_pin: schoolDeletePin.trim(),
+          score_id: scoreId,
+        });
+
+        if (error) throw new Error(error.message || "Kunne ikke slette resultatet.");
+      } else {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const current = raw ? JSON.parse(raw) : [];
+        const remainingScores = current.filter((entry) => entry.id !== scoreId);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(remainingScores));
+      }
+
+      await refreshSchoolBattleScores(highscoreMode);
+      setSchoolDeleteMessage("Resultatet er slettet.");
+    } catch (error) {
+      setSchoolDeleteMessage(error.message);
+    }
+  }
+
   async function resetHighscore() {
     setAdminMessage("");
 
@@ -771,31 +809,62 @@ export default function App() {
       await clearScores(pin, adminResetMode, highscoreGradeLevel);
       setPin("");
 
-      if (adminResetMode === "all" || adminResetMode === highscoreMode) {
-        setScores([]);
-      } else {
-        await refreshScores(highscoreMode, highscoreLevel, highscoreGradeLevel);
-      }
+      if (adminResetMode === "all" || adminResetMode === highscoreMode) setScores([]);
+      else await refreshScores(highscoreMode, highscoreLevel, highscoreGradeLevel);
 
-      const resetText =
-        adminResetMode === "all"
-          ? "alle highscore-lister"
-          : `${getModeLabel(adminResetMode).toLowerCase()}-listen`;
-
+      const resetText = adminResetMode === "all" ? "alle highscore-lister" : `${getModeLabel(adminResetMode).toLowerCase()}-listen`;
       setAdminMessage(`Nullstilte ${resetText} for ${getGradeLabel(highscoreGradeLevel)}.`);
     } catch (error) {
       setAdminMessage(error.message);
     }
   }
 
+  if (screen === "home") {
+    return (
+      <Shell>
+        <div className="hero">
+          <div className="icon-box icon-blue"><Zap /></div>
+          <h1>Regnemester</h1>
+          <p>Velg spilltype.</p>
+        </div>
+
+        <div className="card input-card">
+          <Button
+            onClick={() => {
+              setGameType("normal");
+              setScreen("grade");
+            }}
+            className="full"
+          >
+            Normal
+          </Button>
+
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setGameType("school_battle");
+              setGameLevel("medium");
+              setScreen("school");
+            }}
+            className="full top-space"
+          >
+            Skolekampen
+          </Button>
+        </div>
+
+        <Button variant="light" onClick={() => setScreen("qr")} className="full top-space">
+          Vis QR-kode
+        </Button>
+      </Shell>
+    );
+  }
+
   if (screen === "grade") {
     return (
       <Shell>
         <div className="hero">
-          <div className="icon-box icon-blue">
-            <Zap />
-          </div>
-          <h1>Regnemester</h1>
+          <div className="icon-box icon-blue"><Zap /></div>
+          <h1>Normal</h1>
           <p>Velg trinn.</p>
         </div>
 
@@ -816,28 +885,60 @@ export default function App() {
           ))}
         </div>
 
-        <Button variant="light" onClick={() => setScreen("qr")} className="full top-space">
-          Vis QR-kode
+        <Button variant="light" onClick={() => setScreen("home")} className="full top-space">
+          Tilbake
         </Button>
       </Shell>
     );
   }
 
-  if (screen === "mode") {
+  if (screen === "school") {
     return (
       <Shell>
         <div className="hero">
-          <div className="icon-box icon-blue">
-            <Zap />
-          </div>
-          <h1>Regnemester</h1>
-          <p>{getGradeLabel(gameGradeLevel)} - velg hva du vil øve på.</p>
+          <div className="icon-box icon-blue"><Trophy /></div>
+          <h1>Skolekampen</h1>
+          <p>Velg skole.</p>
+        </div>
+
+        <div className="card input-card">
+          {SCHOOL_OPTIONS.map((school) => (
+            <Button
+              key={school}
+              variant={schoolBattleSchool === school ? "primary" : "light"}
+              onClick={() => {
+                setSchoolBattleSchool(school);
+                setScreen("schoolMode");
+              }}
+              className="full top-space"
+            >
+              {school}
+            </Button>
+          ))}
+        </div>
+
+        <Button variant="light" onClick={() => setScreen("home")} className="full top-space">
+          Tilbake
+        </Button>
+      </Shell>
+    );
+  }
+
+  if (screen === "schoolMode") {
+    return (
+      <Shell>
+        <div className="hero">
+          <div className="icon-box icon-blue"><Trophy /></div>
+          <h1>Skolekampen</h1>
+          <p>{schoolBattleSchool}</p>
+          <p className="small-note">70 sekunder · Middels nivå</p>
         </div>
 
         <div className="card input-card">
           <Button
             onClick={() => {
               setGameMode("multiplication");
+              setGameLevel("medium");
               setScreen("start");
             }}
             className="full"
@@ -849,6 +950,7 @@ export default function App() {
             variant="secondary"
             onClick={() => {
               setGameMode("division");
+              setGameLevel("medium");
               setScreen("start");
             }}
             className="full top-space"
@@ -857,14 +959,33 @@ export default function App() {
           </Button>
         </div>
 
-        <Button variant="secondary" onClick={() => openHighscore(gameMode, gameLevel, gameGradeLevel)} className="full top-space">
+        <Button variant="secondary" onClick={() => openSchoolBattleHighscore(gameMode)} className="full top-space">
           Se highscore
         </Button>
 
-        <Button variant="light" onClick={() => setScreen("grade")} className="full top-space">
+        <Button variant="light" onClick={() => setScreen("school")} className="full top-space">
           Tilbake
         </Button>
+      </Shell>
+    );
+  }
 
+  if (screen === "mode") {
+    return (
+      <Shell>
+        <div className="hero">
+          <div className="icon-box icon-blue"><Zap /></div>
+          <h1>Normal</h1>
+          <p>{getGradeLabel(gameGradeLevel)} - velg hva du vil øve på.</p>
+        </div>
+
+        <div className="card input-card">
+          <Button onClick={() => { setGameMode("multiplication"); setScreen("start"); }} className="full">Multiplikasjon</Button>
+          <Button variant="secondary" onClick={() => { setGameMode("division"); setScreen("start"); }} className="full top-space">Divisjon</Button>
+        </div>
+
+        <Button variant="secondary" onClick={() => openHighscore(gameMode, gameLevel, gameGradeLevel)} className="full top-space">Se highscore</Button>
+        <Button variant="light" onClick={() => setScreen("grade")} className="full top-space">Tilbake</Button>
         <p className="small-note">Velg trinn og regneart før du starter spillet.</p>
       </Shell>
     );
@@ -874,9 +995,7 @@ export default function App() {
     return (
       <Shell>
         <div className="hero compact">
-          <div className="icon-box icon-yellow">
-            <Zap />
-          </div>
+          <div className="icon-box icon-yellow"><Zap /></div>
           <h1>QR-kode</h1>
           <p>Skann for å åpne Regnemester.</p>
         </div>
@@ -886,9 +1005,7 @@ export default function App() {
           <p className="small-note">{APP_URL}</p>
         </div>
 
-        <Button variant="light" onClick={() => setScreen("grade")} className="full top-space">
-          Tilbake
-        </Button>
+        <Button variant="light" onClick={() => setScreen("home")} className="full top-space">Tilbake</Button>
       </Shell>
     );
   }
@@ -897,68 +1014,42 @@ export default function App() {
     return (
       <Shell>
         <div className="hero">
-          <div className="icon-box icon-blue">
-            <Zap />
-          </div>
-          <h1>Regnemester</h1>
+          <div className="icon-box icon-blue"><Zap /></div>
+          <h1>{gameType === "school_battle" ? "Skolekampen" : "Regnemester"}</h1>
           <p>
             {gameMode === "multiplication"
-              ? "Hvor mange gangestykker klarer du på 60 sekunder?"
-              : "Hvor mange divisjonsstykker klarer du på 60 sekunder?"}
+              ? `Hvor mange gangestykker klarer du på ${getGameSeconds(gameType)} sekunder?`
+              : `Hvor mange divisjonsstykker klarer du på ${getGameSeconds(gameType)} sekunder?`}
           </p>
-          <p className="small-note">{getGradeLabel(gameGradeLevel)} · {getLevelDescription(gameMode, gameLevel)}</p>
+          {gameType === "school_battle" ? (
+            <p className="small-note">{schoolBattleSchool} · Middels nivå · 70 sekunder</p>
+          ) : (
+            <p className="small-note">{getGradeLabel(gameGradeLevel)} · {getLevelDescription(gameMode, gameLevel)}</p>
+          )}
         </div>
 
-        <div className="card input-card">
-          <label>Velg nivå</label>
-
-          <Button
-            variant={gameLevel === "easy" ? "primary" : "light"}
-            onClick={() => setGameLevel("easy")}
-            className="full"
-          >
-            Lett
-          </Button>
-
-          <Button
-            variant={gameLevel === "medium" ? "primary" : "light"}
-            onClick={() => setGameLevel("medium")}
-            className="full top-space"
-          >
-            Middels
-          </Button>
-
-          <Button
-            variant={gameLevel === "hard" ? "primary" : "light"}
-            onClick={() => setGameLevel("hard")}
-            className="full top-space"
-          >
-            Vanskelig
-          </Button>
-        </div>
+        {gameType === "normal" ? (
+          <div className="card input-card">
+            <label>Velg nivå</label>
+            <Button variant={gameLevel === "easy" ? "primary" : "light"} onClick={() => setGameLevel("easy")} className="full">Lett</Button>
+            <Button variant={gameLevel === "medium" ? "primary" : "light"} onClick={() => setGameLevel("medium")} className="full top-space">Middels</Button>
+            <Button variant={gameLevel === "hard" ? "primary" : "light"} onClick={() => setGameLevel("hard")} className="full top-space">Vanskelig</Button>
+          </div>
+        ) : (
+          <div className="card input-card">
+            <label>Skolekampen</label>
+            <p className="small-note">Nivået er låst til Middels.</p>
+          </div>
+        )}
 
         <div className="card input-card">
           <label htmlFor="player-name">Skriv spillnavn</label>
-          <input
-            id="player-name"
-            value={playerName}
-            onChange={(event) => setPlayerName(event.target.value)}
-            maxLength={18}
-            placeholder="f.eks. Tiger23"
-            autoComplete="off"
-          />
-
+          <input id="player-name" value={playerName} onChange={(event) => setPlayerName(event.target.value)} maxLength={18} placeholder="f.eks. Tiger23" autoComplete="off" />
           {nameError && <p className="admin-message">{nameError}</p>}
-
-          <Button onClick={startGame} disabled={!trimmedName} className="full">
-            Start spillet
-          </Button>
+          <Button onClick={startGame} disabled={!trimmedName} className="full">Start spillet</Button>
         </div>
 
-        <Button variant="light" onClick={() => setScreen("mode")} className="full top-space">
-          Bytt spilltype
-        </Button>
-
+        <Button variant="light" onClick={() => setScreen(gameType === "school_battle" ? "schoolMode" : "mode")} className="full top-space">Tilbake</Button>
         <p className="small-note">Ikke bruk etternavn. Bruk spillnavn eller fornavn.</p>
       </Shell>
     );
@@ -968,41 +1059,22 @@ export default function App() {
     return (
       <Shell>
         <div className="status-row">
-          <div className="status-pill red">
-            <Timer />
-            <span>{timeLeft} sek</span>
-          </div>
-          <div className="status-pill green">
-            <Trophy />
-            <span>{score} poeng</span>
-          </div>
+          <div className="status-pill red"><Timer /><span>{timeLeft} sek</span></div>
+          <div className="status-pill green"><Trophy /><span>{score} poeng</span></div>
         </div>
 
         <div className="card question-card">
           <p className="label">Velg riktig svar</p>
-          <h2>
-            {question.a} {question.symbol} {question.b} = ?
-          </h2>
+          <h2>{question.a} {question.symbol} {question.b} = ?</h2>
         </div>
 
         <div className="answer-grid">
           {question.options.map((option) => {
             let answerClass = "answer-button";
-
             if (feedback === "correct" && option === question.correct) answerClass += " correct";
             if (feedback === "wrong" && option !== question.correct) answerClass += " wrong";
             if (feedback === "wrong" && option === question.correct) answerClass += " correct";
-
-            return (
-              <button
-                key={option}
-                onClick={() => answer(option)}
-                disabled={Boolean(feedback)}
-                className={answerClass}
-              >
-                {option}
-              </button>
-            );
+            return <button key={option} onClick={() => answer(option)} disabled={Boolean(feedback)} className={answerClass}>{option}</button>;
           })}
         </div>
 
@@ -1018,9 +1090,7 @@ export default function App() {
   if (screen === "result") {
     return (
       <Shell>
-        <div className="hero compact">
-          <h1>Tiden er ute!</h1>
-        </div>
+        <div className="hero compact"><h1>Tiden er ute!</h1></div>
 
         <div className="card result-card">
           <p>Du fikk</p>
@@ -1034,15 +1104,78 @@ export default function App() {
 
         <div className="stack">
           <Button onClick={startGame}>Spill igjen</Button>
-          <Button variant="secondary" onClick={() => openHighscore(gameMode, gameLevel, gameGradeLevel)}>
-            Se highscore
-          </Button>
-          <Button variant="light" onClick={() => setScreen("mode")}>
-            Til start
-          </Button>
+          <Button variant="secondary" onClick={() => (gameType === "school_battle" ? openSchoolBattleHighscore(gameMode) : openHighscore(gameMode, gameLevel, gameGradeLevel))}>Se highscore</Button>
+          <Button variant="light" onClick={() => setScreen(gameType === "school_battle" ? "schoolMode" : "mode")}>Tilbake</Button>
         </div>
 
-        <p className="small-note">Stjerner vises bare her. Highscore lagrer kun navn og poeng.</p>
+        <p className="small-note">Stjerner vises bare her. Highscore lagrer kun relevante toppresultater.</p>
+      </Shell>
+    );
+  }
+
+  if (screen === "schoolHighscore") {
+    return (
+      <Shell>
+        <div className="hero compact">
+          <div className="icon-box icon-yellow"><Crown /></div>
+          <h1>Skolekampen</h1>
+          <p>{getModeLabel(highscoreMode)} - Topp 20</p>
+        </div>
+
+        <div className="card input-card">
+          <Button variant={highscoreMode === "multiplication" ? "primary" : "light"} onClick={() => changeSchoolBattleHighscoreMode("multiplication")} className="full">Multiplikasjon</Button>
+          <Button variant={highscoreMode === "division" ? "primary" : "light"} onClick={() => changeSchoolBattleHighscoreMode("division")} className="full top-space">Divisjon</Button>
+        </div>
+
+        {scoreMessage && <p className="error-box">{scoreMessage}</p>}
+
+        <div className="card input-card">
+          <label htmlFor="school-delete-pin">Slettekode</label>
+          <input
+            id="school-delete-pin"
+            value={schoolDeletePin}
+            onChange={(event) => setSchoolDeletePin(event.target.value)}
+            type="password"
+            inputMode="numeric"
+            placeholder="8-sifret kode"
+            maxLength={8}
+          />
+          {schoolDeleteMessage && <p className="admin-message">{schoolDeleteMessage}</p>}
+          <p className="small-note">Skriv slettekoden for å kunne slette enkeltresultater.</p>
+        </div>
+
+        <div className="card highscore-card">
+          {scores.length === 0 ? (
+            <div className="empty-state"><h2>Ingen resultater ennå</h2><p>Spill en runde i Skolekampen for å lage første score.</p></div>
+          ) : (
+            <div className="score-list">
+              {scores.map((entry, index) => (
+                <div key={`${entry.name}-${entry.school}-${entry.score}-${index}`} className="score-row">
+                  <div className="score-name">
+                    <span className={index === 0 ? "rank rank-first" : "rank"}>{index + 1}</span>
+                    <strong>{entry.name}</strong>
+                    <small>{entry.school}</small>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span className="score-value">{entry.score}</span>
+                    {schoolDeletePin.trim().length === 8 && entry.id && (
+                      <button
+                        type="button"
+                        className="button button-danger"
+                        onClick={() => deleteSchoolBattleScore(entry.id)}
+                        style={{ padding: "8px 10px", fontSize: "0.8rem" }}
+                      >
+                        Slett
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="stack"><Button onClick={() => setScreen("schoolMode")}>Tilbake</Button></div>
       </Shell>
     );
   }
@@ -1051,73 +1184,32 @@ export default function App() {
     return (
       <Shell>
         <div className="hero compact">
-          <div className="icon-box icon-yellow">
-            <Crown />
-          </div>
+          <div className="icon-box icon-yellow"><Crown /></div>
           <h1>Highscore</h1>
           <p>{getHighscoreTitle(highscoreMode, highscoreLevel, highscoreGradeLevel)}</p>
         </div>
 
         <div className="card input-card">
-          <Button
-            variant={highscoreMode === "multiplication" ? "primary" : "light"}
-            onClick={() => changeHighscoreMode("multiplication")}
-            className="full"
-          >
-            Multiplikasjon
-          </Button>
-
-          <Button
-            variant={highscoreMode === "division" ? "primary" : "light"}
-            onClick={() => changeHighscoreMode("division")}
-            className="full top-space"
-          >
-            Divisjon
-          </Button>
+          <Button variant={highscoreMode === "multiplication" ? "primary" : "light"} onClick={() => changeHighscoreMode("multiplication")} className="full">Multiplikasjon</Button>
+          <Button variant={highscoreMode === "division" ? "primary" : "light"} onClick={() => changeHighscoreMode("division")} className="full top-space">Divisjon</Button>
         </div>
 
         <div className="card input-card">
-          <Button
-            variant={highscoreLevel === "easy" ? "primary" : "light"}
-            onClick={() => changeHighscoreLevel("easy")}
-            className="full"
-          >
-            Lett
-          </Button>
-
-          <Button
-            variant={highscoreLevel === "medium" ? "primary" : "light"}
-            onClick={() => changeHighscoreLevel("medium")}
-            className="full top-space"
-          >
-            Middels
-          </Button>
-
-          <Button
-            variant={highscoreLevel === "hard" ? "primary" : "light"}
-            onClick={() => changeHighscoreLevel("hard")}
-            className="full top-space"
-          >
-            Vanskelig
-          </Button>
+          <Button variant={highscoreLevel === "easy" ? "primary" : "light"} onClick={() => changeHighscoreLevel("easy")} className="full">Lett</Button>
+          <Button variant={highscoreLevel === "medium" ? "primary" : "light"} onClick={() => changeHighscoreLevel("medium")} className="full top-space">Middels</Button>
+          <Button variant={highscoreLevel === "hard" ? "primary" : "light"} onClick={() => changeHighscoreLevel("hard")} className="full top-space">Vanskelig</Button>
         </div>
 
         {scoreMessage && <p className="error-box">{scoreMessage}</p>}
 
         <div className="card highscore-card">
           {scores.length === 0 ? (
-            <div className="empty-state">
-              <h2>Ingen resultater ennå</h2>
-              <p>Spill en runde i {getGradeLabel(highscoreGradeLevel)} med {getModeLabel(highscoreMode).toLowerCase()} på {getLevelLabel(highscoreLevel).toLowerCase()} nivå for å lage første score.</p>
-            </div>
+            <div className="empty-state"><h2>Ingen resultater ennå</h2><p>Spill en runde i {getGradeLabel(highscoreGradeLevel)} med {getModeLabel(highscoreMode).toLowerCase()} på {getLevelLabel(highscoreLevel).toLowerCase()} nivå for å lage første score.</p></div>
           ) : (
             <div className="score-list">
               {scores.map((entry, index) => (
                 <div key={`${entry.name}-${entry.score}-${index}`} className="score-row">
-                  <div className="score-name">
-                    <span className={index === 0 ? "rank rank-first" : "rank"}>{index + 1}</span>
-                    <strong>{entry.name}</strong>
-                  </div>
+                  <div className="score-name"><span className={index === 0 ? "rank rank-first" : "rank"}>{index + 1}</span><strong>{entry.name}</strong></div>
                   <span className="score-value">{entry.score}</span>
                 </div>
               ))}
@@ -1127,9 +1219,7 @@ export default function App() {
 
         <div className="stack">
           <Button onClick={() => setScreen("mode")}>Tilbake</Button>
-          <Button variant="light" onClick={() => setScreen("admin")}>
-            Admin
-          </Button>
+          <Button variant="light" onClick={() => setScreen("admin")}>Admin</Button>
         </div>
       </Shell>
     );
@@ -1138,58 +1228,24 @@ export default function App() {
   return (
     <Shell>
       <div className="hero compact">
-        <div className="icon-box icon-red">
-          <Shield />
-        </div>
+        <div className="icon-box icon-red"><Shield /></div>
         <h1>Admin</h1>
         <p>Nullstill highscore-listen for {getGradeLabel(highscoreGradeLevel)}</p>
       </div>
 
       <div className="card input-card">
         <label>Hva vil du nullstille?</label>
-
-        <Button
-          variant={adminResetMode === "multiplication" ? "primary" : "light"}
-          onClick={() => setAdminResetMode("multiplication")}
-          className="full"
-        >
-          Multiplikasjon
-        </Button>
-
-        <Button
-          variant={adminResetMode === "division" ? "primary" : "light"}
-          onClick={() => setAdminResetMode("division")}
-          className="full top-space"
-        >
-          Divisjon
-        </Button>
-
-        <Button
-          variant={adminResetMode === "all" ? "danger" : "light"}
-          onClick={() => setAdminResetMode("all")}
-          className="full top-space"
-        >
-          Alt
-        </Button>
+        <Button variant={adminResetMode === "multiplication" ? "primary" : "light"} onClick={() => setAdminResetMode("multiplication")} className="full">Multiplikasjon</Button>
+        <Button variant={adminResetMode === "division" ? "primary" : "light"} onClick={() => setAdminResetMode("division")} className="full top-space">Divisjon</Button>
+        <Button variant={adminResetMode === "all" ? "danger" : "light"} onClick={() => setAdminResetMode("all")} className="full top-space">Alt</Button>
 
         <label htmlFor="admin-pin" className="top-space">Skriv PIN</label>
-        <input
-          id="admin-pin"
-          value={pin}
-          onChange={(event) => setPin(event.target.value)}
-          type="password"
-          inputMode="numeric"
-          placeholder="PIN"
-        />
-        <Button variant="danger" onClick={resetHighscore} className="full">
-          Nullstill highscore
-        </Button>
+        <input id="admin-pin" value={pin} onChange={(event) => setPin(event.target.value)} type="password" inputMode="numeric" placeholder="PIN" />
+        <Button variant="danger" onClick={resetHighscore} className="full">Nullstill highscore</Button>
         {adminMessage && <p className="admin-message">{adminMessage}</p>}
       </div>
 
-      <Button variant="light" onClick={() => setScreen("highscore")} className="full top-space">
-        Tilbake
-      </Button>
+      <Button variant="light" onClick={() => setScreen("highscore")} className="full top-space">Tilbake</Button>
     </Shell>
   );
 }
