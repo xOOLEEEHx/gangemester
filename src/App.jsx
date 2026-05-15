@@ -464,14 +464,73 @@ async function loadScores(mode = "multiplication", level = "medium", gradeLevel 
 
 async function saveScore(entry) {
   if (supabase) {
-    const { error } = await supabase.from("scores").insert(entry);
+    const { data, error } = await supabase.rpc("save_top_score", {
+      player_name: entry.name,
+      player_score: entry.score,
+      score_mode: entry.mode,
+      score_level: entry.level,
+      score_grade_level: entry.grade_level,
+    });
+
     if (error) throw new Error(error.message || "Kunne ikke lagre score.");
-    return;
+
+    const result = Array.isArray(data) ? data[0] : data;
+
+    return {
+      saved: Boolean(result?.saved),
+      message: result?.message || "Resultatet er sjekket mot highscore-listen.",
+    };
   }
 
   const raw = localStorage.getItem(STORAGE_KEY);
   const current = raw ? JSON.parse(raw) : [];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...current, entry]));
+  const matchingScores = current
+    .filter(
+      (storedEntry) =>
+        (storedEntry.mode || "multiplication") === entry.mode &&
+        (storedEntry.level || "medium") === entry.level &&
+        Number(storedEntry.grade_level || 4) === Number(entry.grade_level)
+    )
+    .sort((a, b) => Number(b.score) - Number(a.score));
+
+  const lowestTopScore = matchingScores[9]?.score;
+  const shouldSave = matchingScores.length < 10 || entry.score > Number(lowestTopScore);
+
+  if (!shouldSave) {
+    return {
+      saved: false,
+      message: `Du fikk ${entry.score} poeng. Det holdt ikke til topp 10 denne gangen.`,
+    };
+  }
+
+  const updatedScores = [...current, entry];
+  const trimmedScores = updatedScores.filter((storedEntry) => {
+    const sameList =
+      (storedEntry.mode || "multiplication") === entry.mode &&
+      (storedEntry.level || "medium") === entry.level &&
+      Number(storedEntry.grade_level || 4) === Number(entry.grade_level);
+
+    if (!sameList) return true;
+
+    const sameListScores = updatedScores
+      .filter(
+        (scoreEntry) =>
+          (scoreEntry.mode || "multiplication") === entry.mode &&
+          (scoreEntry.level || "medium") === entry.level &&
+          Number(scoreEntry.grade_level || 4) === Number(entry.grade_level)
+      )
+      .sort((a, b) => Number(b.score) - Number(a.score))
+      .slice(0, 10);
+
+    return sameListScores.includes(storedEntry);
+  });
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmedScores));
+
+  return {
+    saved: true,
+    message: "Du kom på highscore-listen!",
+  };
 }
 
 async function clearScores(adminPin, resetMode = "all", resetGradeLevel = 4) {
@@ -662,17 +721,24 @@ export default function App() {
       savedThisRound.current = true;
 
       try {
-        await saveScore({
+        const saveResult = await saveScore({
           name: trimmedName.slice(0, 18),
           score,
           mode: gameMode,
           level: gameLevel,
           grade_level: gameGradeLevel,
         });
+
         setHighscoreMode(gameMode);
         setHighscoreLevel(gameLevel);
         setHighscoreGradeLevel(gameGradeLevel);
         await refreshScores(gameMode, gameLevel, gameGradeLevel);
+
+        if (saveResult.saved) {
+          setScoreMessage(`Du fikk ${score} poeng. ${saveResult.message}`);
+        } else {
+          setScoreMessage(`Du fikk ${score} poeng. ${saveResult.message}`);
+        }
       } catch (error) {
         setScoreMessage(error.message);
       }
@@ -790,6 +856,10 @@ export default function App() {
           </Button>
         </div>
 
+        <Button variant="secondary" onClick={() => openHighscore(gameMode, gameLevel, gameGradeLevel)} className="full top-space">
+          Se highscore
+        </Button>
+
         <Button variant="light" onClick={() => setScreen("grade")} className="full top-space">
           Bytt trinn
         </Button>
@@ -887,10 +957,6 @@ export default function App() {
             Start spillet
           </Button>
         </div>
-
-        <Button variant="secondary" onClick={() => openHighscore(gameMode)} className="full top-space">
-          Se highscore
-        </Button>
 
         <Button variant="light" onClick={() => setScreen("mode")} className="full top-space">
           Bytt spilltype
@@ -993,20 +1059,6 @@ export default function App() {
           </div>
           <h1>Highscore</h1>
           <p>{getHighscoreTitle(highscoreMode, highscoreLevel, highscoreGradeLevel)}</p>
-        </div>
-
-        <div className="card input-card">
-          <label>Velg trinn</label>
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((grade) => (
-            <Button
-              key={grade}
-              variant={highscoreGradeLevel === grade ? "primary" : "light"}
-              onClick={() => changeHighscoreGradeLevel(grade)}
-              className="full top-space"
-            >
-              {getGradeLabel(grade)}
-            </Button>
-          ))}
         </div>
 
         <div className="card input-card">
