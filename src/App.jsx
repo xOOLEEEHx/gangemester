@@ -704,13 +704,16 @@ async function clearScores(adminPin, resetMode = "all", resetGradeLevel = 4) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(remainingScores));
 }
 
-async function clearNormalScoreList(adminPin, resetMode, resetLevel, resetGradeLevel) {
+async function clearNormalScoreList(adminPin, resetMode, resetLevel, resetGradeLevel, resetQuestionCount = null) {
+  const isTimedList = isTimeChallengeMode(resetMode);
+
   if (supabase) {
     const { error } = await supabase.rpc("reset_normal_score_list", {
       admin_pin: adminPin,
       reset_mode: resetMode,
       reset_level: resetLevel,
       reset_grade_level: resetGradeLevel,
+      reset_question_count: isTimedList ? resetQuestionCount : null,
     });
 
     if (error) throw new Error(error.message || "Kunne ikke tømme listen.");
@@ -722,12 +725,15 @@ async function clearNormalScoreList(adminPin, resetMode, resetLevel, resetGradeL
   const raw = localStorage.getItem(STORAGE_KEY);
   const current = raw ? JSON.parse(raw) : [];
   const remainingScores = current.filter((entry) => {
-    return !(
+    const sameBaseList =
       (entry.game_type || "normal") === "normal" &&
       (entry.mode || "multiplication") === resetMode &&
       (entry.level || "medium") === resetLevel &&
-      Number(entry.grade_level || 4) === Number(resetGradeLevel)
-    );
+      Number(entry.grade_level || 4) === Number(resetGradeLevel);
+
+    if (!sameBaseList) return true;
+    if (!isTimedList) return false;
+    return Number(entry.question_count || 0) !== Number(resetQuestionCount);
   });
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(remainingScores));
@@ -1142,9 +1148,11 @@ export default function App() {
     setAdminMessage("");
 
     try {
-      await clearNormalScoreList(adminAccessPin, adminNormalMode, adminNormalLevel, adminNormalGradeLevel);
+      await clearNormalScoreList(adminAccessPin, adminNormalMode, adminNormalLevel, adminNormalGradeLevel, adminNormalQuestionCount);
       setScores([]);
-      setAdminMessage(`Tømte ${getGradeLabel(adminNormalGradeLevel)} - ${getModeLabel(adminNormalMode).toLowerCase()} - ${getLevelLabel(adminNormalLevel).toLowerCase()}.`);
+      setAdminMessage(
+        `Tømte ${getGradeLabel(adminNormalGradeLevel)} - ${getModeLabel(adminNormalMode).toLowerCase()} - ${getLevelLabel(adminNormalLevel).toLowerCase()}${isTimeChallengeMode(adminNormalMode) ? ` - ${adminNormalQuestionCount} oppgaver` : ""}.`
+      );
     } catch (error) {
       setAdminMessage(error.message);
     }
@@ -1762,11 +1770,7 @@ export default function App() {
           <p className="small-note">
             Valgt liste: {getGradeLabel(adminNormalGradeLevel)} · {getModeLabel(adminNormalMode)} · {getLevelLabel(adminNormalLevel)}{timedAdminList ? ` · ${adminNormalQuestionCount} oppgaver` : ""}
           </p>
-          {timedAdminList ? (
-            <p className="small-note">For addisjon og subtraksjon kan du slette enkeltresultater nå. Tømming av hele tidslistene tar vi i et eget lite steg senere.</p>
-          ) : (
-            <Button variant="danger" onClick={resetNormalFromAdmin} className="full">Tøm denne listen</Button>
-          )}
+          <Button variant="danger" onClick={resetNormalFromAdmin} className="full">Tøm denne listen</Button>
           {adminMessage && <p className="admin-message">{adminMessage}</p>}
         </div>
 
