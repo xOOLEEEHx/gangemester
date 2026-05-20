@@ -15,6 +15,9 @@ const ADMIN_PIN_FALLBACK = import.meta.env.VITE_ADMIN_PIN_FALLBACK || "48291736"
 const APP_URL = "https://regnemester.vercel.app/";
 
 const MODE_ORDER = ["addition", "subtraction", "multiplication", "division"];
+const LEVEL_ORDER = ["easy", "medium", "hard"];
+const GRADE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
+const ALL_FILTER_VALUE = "all";
 
 const SCHOOL_OPTIONS = [
   "Austafjord skole",
@@ -186,6 +189,106 @@ function getHighscoreTitle(mode, level, gradeLevel, questionCount = 10) {
   const baseTitle = `${getGradeLabel(gradeLevel)} - ${getModeLabel(mode)} - ${getLevelLabel(level)}`;
   if (isTimeChallengeMode(mode)) return `${baseTitle} - ${questionCount} oppgaver - Topp 10`;
   return `${baseTitle} - Topp 10`;
+}
+
+function getNormalAdminQuestionCount(entry) {
+  const count = Number(entry?.question_count || 0);
+  return count > 0 ? count : 10;
+}
+
+function normalizeNormalAdminScore(entry) {
+  const mode = entry?.mode || "multiplication";
+  const isTimed = isTimeChallengeMode(mode);
+  return {
+    id: entry?.id,
+    name: typeof entry?.name === "string" ? entry.name : "",
+    score: Number(entry?.score),
+    mode,
+    level: entry?.level || "medium",
+    grade_level: Number(entry?.grade_level || 4),
+    game_type: "normal",
+    question_count: isTimed ? getNormalAdminQuestionCount(entry) : 0,
+  };
+}
+
+function sortNormalAdminEntries(entries, mode) {
+  const isTimed = isTimeChallengeMode(mode);
+  return [...entries].sort((a, b) => (isTimed ? Number(a.score) - Number(b.score) : Number(b.score) - Number(a.score)));
+}
+
+function getNormalAdminGroupKey(entry) {
+  const isTimed = isTimeChallengeMode(entry.mode);
+  const questionPart = isTimed ? getNormalAdminQuestionCount(entry) : "score";
+  return `${entry.grade_level}-${entry.mode}-${entry.level}-${questionPart}`;
+}
+
+function getNormalAdminGroupTitle(group) {
+  const baseTitle = `${getGradeLabel(group.gradeLevel)} · ${getModeLabel(group.mode)} · ${getLevelLabel(group.level)}`;
+  if (isTimeChallengeMode(group.mode)) return `${baseTitle} · ${group.questionCount} oppgaver`;
+  return baseTitle;
+}
+
+function buildNormalAdminGroups(entries, filters = {}) {
+  const searchTerm = (filters.search || "").trim().toLowerCase();
+  const gradeFilter = filters.grade ?? ALL_FILTER_VALUE;
+  const modeFilter = filters.mode ?? ALL_FILTER_VALUE;
+  const levelFilter = filters.level ?? ALL_FILTER_VALUE;
+  const questionCountFilter = filters.questionCount ?? ALL_FILTER_VALUE;
+  const grouped = new Map();
+
+  entries
+    .map(normalizeNormalAdminScore)
+    .filter((entry) => entry.name && Number.isFinite(entry.score))
+    .forEach((entry) => {
+      if (gradeFilter !== ALL_FILTER_VALUE && Number(entry.grade_level) !== Number(gradeFilter)) return;
+      if (modeFilter !== ALL_FILTER_VALUE && entry.mode !== modeFilter) return;
+      if (levelFilter !== ALL_FILTER_VALUE && entry.level !== levelFilter) return;
+      if (questionCountFilter !== ALL_FILTER_VALUE && isTimeChallengeMode(entry.mode) && Number(entry.question_count) !== Number(questionCountFilter)) return;
+      if (questionCountFilter !== ALL_FILTER_VALUE && !isTimeChallengeMode(entry.mode)) return;
+      if (searchTerm && !entry.name.toLowerCase().includes(searchTerm)) return;
+
+      const key = getNormalAdminGroupKey(entry);
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          key,
+          gradeLevel: entry.grade_level,
+          mode: entry.mode,
+          level: entry.level,
+          questionCount: isTimeChallengeMode(entry.mode) ? getNormalAdminQuestionCount(entry) : null,
+          entries: [],
+        });
+      }
+      grouped.get(key).entries.push(entry);
+    });
+
+  return [...grouped.values()]
+    .map((group) => ({ ...group, entries: sortNormalAdminEntries(group.entries, group.mode) }))
+    .sort((a, b) => {
+      if (a.gradeLevel !== b.gradeLevel) return a.gradeLevel - b.gradeLevel;
+      const modeDiff = MODE_ORDER.indexOf(a.mode) - MODE_ORDER.indexOf(b.mode);
+      if (modeDiff !== 0) return modeDiff;
+      const levelDiff = LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level);
+      if (levelDiff !== 0) return levelDiff;
+      return Number(a.questionCount || 0) - Number(b.questionCount || 0);
+    });
+}
+
+function getNormalAdminStats(entries) {
+  const normalizedEntries = entries.map(normalizeNormalAdminScore).filter((entry) => entry.name && Number.isFinite(entry.score));
+  const groups = buildNormalAdminGroups(normalizedEntries);
+  const bestScoreEntry = normalizedEntries
+    .filter((entry) => !isTimeChallengeMode(entry.mode))
+    .sort((a, b) => Number(b.score) - Number(a.score))[0];
+  const bestTimeEntry = normalizedEntries
+    .filter((entry) => isTimeChallengeMode(entry.mode))
+    .sort((a, b) => Number(a.score) - Number(b.score))[0];
+
+  return {
+    totalResults: normalizedEntries.length,
+    activeLists: groups.length,
+    bestScoreEntry,
+    bestTimeEntry,
+  };
 }
 
 function randomWrongAnswer(correct) {
@@ -459,6 +562,29 @@ async function loadScores(mode = "multiplication", level = "medium", gradeLevel 
     return [];
   }
 }
+
+
+async function loadAllNormalAdminScores() {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("scores")
+      .select("id, name, score, mode, level, grade_level, game_type, question_count")
+      .eq("game_type", "normal");
+    if (!error && data) return data.map(normalizeNormalAdminScore).filter((entry) => entry.name && Number.isFinite(entry.score));
+    throw new Error(error?.message || "Kunne ikke hente Normal-resultater.");
+  }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const storedScores = raw ? JSON.parse(raw) : [];
+    return storedScores
+      .filter((entry) => (entry.game_type || "normal") === "normal")
+      .map(normalizeNormalAdminScore)
+      .filter((entry) => entry.name && Number.isFinite(entry.score));
+  } catch {
+    return [];
+  }
+}
+
 
 async function loadSchoolBattleScores(mode = "multiplication", gradeGroup = "small") {
   const isTimed = isTimeChallengeMode(mode);
@@ -943,6 +1069,12 @@ export default function App() {
   const [adminNormalMode, setAdminNormalMode] = useState("addition");
   const [adminNormalLevel, setAdminNormalLevel] = useState("medium");
   const [adminNormalQuestionCount, setAdminNormalQuestionCount] = useState(10);
+  const [adminNormalScores, setAdminNormalScores] = useState([]);
+  const [adminNormalSearch, setAdminNormalSearch] = useState("");
+  const [adminNormalGradeFilter, setAdminNormalGradeFilter] = useState(ALL_FILTER_VALUE);
+  const [adminNormalModeFilter, setAdminNormalModeFilter] = useState(ALL_FILTER_VALUE);
+  const [adminNormalLevelFilter, setAdminNormalLevelFilter] = useState(ALL_FILTER_VALUE);
+  const [adminNormalQuestionCountFilter, setAdminNormalQuestionCountFilter] = useState(ALL_FILTER_VALUE);
   const [scoreMessage, setScoreMessage] = useState("");
 
   const [bossId, setBossId] = useState("slime");
@@ -967,6 +1099,18 @@ export default function App() {
   const stars = useMemo(() => getStars(score), [score]);
   const isCurrentTimeChallenge = isTimeChallengeMode(gameMode);
   const activeQuestionCount = gameType === "school_battle" && isTimeChallengeMode(gameMode) ? SCHOOL_BATTLE_TIME_QUESTION_COUNT : gameQuestionCount;
+  const adminNormalGroups = useMemo(
+    () =>
+      buildNormalAdminGroups(adminNormalScores, {
+        search: adminNormalSearch,
+        grade: adminNormalGradeFilter,
+        mode: adminNormalModeFilter,
+        level: adminNormalLevelFilter,
+        questionCount: adminNormalQuestionCountFilter,
+      }),
+    [adminNormalScores, adminNormalSearch, adminNormalGradeFilter, adminNormalModeFilter, adminNormalLevelFilter, adminNormalQuestionCountFilter]
+  );
+  const adminNormalStats = useMemo(() => getNormalAdminStats(adminNormalScores), [adminNormalScores]);
 
   useEffect(() => { refreshScores("addition", "medium", 4, 10); }, []);
 
@@ -1110,6 +1254,19 @@ export default function App() {
   async function refreshNormalAdminScores(mode = adminNormalMode, level = adminNormalLevel, gradeLevel = adminNormalGradeLevel, questionCount = adminNormalQuestionCount) {
     try { const loaded = await loadScores(mode, level, gradeLevel, questionCount); setScores(loaded); setAdminMessage(""); } catch (error) { setAdminMessage(error.message); }
   }
+
+  async function refreshAllNormalAdminScores() {
+    try {
+      const loaded = await loadAllNormalAdminScores();
+      setAdminNormalScores(loaded);
+      setAdminMessage("");
+      return loaded;
+    } catch (error) {
+      setAdminMessage(error.message);
+      return [];
+    }
+  }
+
   function changeAdminNormalGradeLevel(gradeLevel) { setAdminNormalGradeLevel(gradeLevel); refreshNormalAdminScores(adminNormalMode, adminNormalLevel, gradeLevel, adminNormalQuestionCount); }
   function changeAdminNormalMode(mode) { setAdminNormalMode(mode); refreshNormalAdminScores(mode, adminNormalLevel, adminNormalGradeLevel, adminNormalQuestionCount); }
   function changeAdminNormalLevel(level) { setAdminNormalLevel(level); refreshNormalAdminScores(adminNormalMode, level, adminNormalGradeLevel, adminNormalQuestionCount); }
@@ -1117,7 +1274,20 @@ export default function App() {
 
   async function deleteNormalScore(scoreId) {
     setAdminMessage("");
-    try { if (supabase) { const { error } = await supabase.rpc("delete_normal_score", { admin_pin: adminAccessPin, score_id: scoreId }); if (error) throw new Error(error.message || "Kunne ikke slette resultatet."); } else { const raw = localStorage.getItem(STORAGE_KEY); const current = raw ? JSON.parse(raw) : []; localStorage.setItem(STORAGE_KEY, JSON.stringify(current.filter((entry) => entry.id !== scoreId))); } await refreshNormalAdminScores(adminNormalMode, adminNormalLevel, adminNormalGradeLevel, adminNormalQuestionCount); setAdminMessage("Resultatet er slettet."); } catch (error) { setAdminMessage(error.message); }
+    try {
+      if (supabase) {
+        const { error } = await supabase.rpc("delete_normal_score", { admin_pin: adminAccessPin, score_id: scoreId });
+        if (error) throw new Error(error.message || "Kunne ikke slette resultatet.");
+      } else {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const current = raw ? JSON.parse(raw) : [];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(current.filter((entry) => entry.id !== scoreId)));
+      }
+      await refreshAllNormalAdminScores();
+      setAdminMessage("Resultatet er slettet.");
+    } catch (error) {
+      setAdminMessage(error.message);
+    }
   }
 
   async function deleteSchoolBattleScore(scoreId) {
@@ -1127,7 +1297,33 @@ export default function App() {
 
   async function resetNormalFromAdmin() {
     setAdminMessage("");
-    try { await clearNormalScoreList(adminAccessPin, adminNormalMode, adminNormalLevel, adminNormalGradeLevel, adminNormalQuestionCount); setScores([]); setAdminMessage(`Tømte ${getGradeLabel(adminNormalGradeLevel)} - ${getModeLabel(adminNormalMode).toLowerCase()} - ${getLevelLabel(adminNormalLevel).toLowerCase()}${isTimeChallengeMode(adminNormalMode) ? ` - ${adminNormalQuestionCount} oppgaver` : ""}.`); } catch (error) { setAdminMessage(error.message); }
+    try {
+      await clearNormalScoreList(adminAccessPin, adminNormalMode, adminNormalLevel, adminNormalGradeLevel, adminNormalQuestionCount);
+      setScores([]);
+      await refreshAllNormalAdminScores();
+      setAdminMessage(`Tømte ${getGradeLabel(adminNormalGradeLevel)} - ${getModeLabel(adminNormalMode).toLowerCase()} - ${getLevelLabel(adminNormalLevel).toLowerCase()}${isTimeChallengeMode(adminNormalMode) ? ` - ${adminNormalQuestionCount} oppgaver` : ""}.`);
+    } catch (error) {
+      setAdminMessage(error.message);
+    }
+  }
+
+  async function resetNormalAdminGroup(group) {
+    setAdminMessage("");
+    try {
+      await clearNormalScoreList(adminAccessPin, group.mode, group.level, group.gradeLevel, group.questionCount);
+      await refreshAllNormalAdminScores();
+      setAdminMessage(`Tømte ${getNormalAdminGroupTitle(group)}.`);
+    } catch (error) {
+      setAdminMessage(error.message);
+    }
+  }
+
+  function clearNormalAdminFilters() {
+    setAdminNormalSearch("");
+    setAdminNormalGradeFilter(ALL_FILTER_VALUE);
+    setAdminNormalModeFilter(ALL_FILTER_VALUE);
+    setAdminNormalLevelFilter(ALL_FILTER_VALUE);
+    setAdminNormalQuestionCountFilter(ALL_FILTER_VALUE);
   }
 
   if (screen === "home") {
@@ -1213,12 +1409,211 @@ export default function App() {
   }
 
   if (screen === "adminHome") {
-    return <Shell><div className="hero compact"><div className="icon-box icon-red"><Shield /></div><h1>Admin</h1><p>Velg hva du vil administrere.</p></div><div className="card input-card"><Button onClick={() => { refreshNormalAdminScores(); setScreen("adminNormal"); }} className="full">Normal highscore</Button><Button variant="secondary" onClick={() => { refreshSchoolBattleScores(highscoreMode); setScreen("adminSchool"); }} className="full top-space">Skolekampen</Button></div><Button variant="light" onClick={() => setScreen("home")} className="full top-space">Tilbake</Button></Shell>;
+    return <Shell><div className="hero compact"><div className="icon-box icon-red"><Shield /></div><h1>Admin</h1><p>Velg hva du vil administrere.</p></div><div className="card input-card"><Button onClick={() => { refreshAllNormalAdminScores(); setScreen("adminNormal"); }} className="full">Normal highscore</Button><Button variant="secondary" onClick={() => { refreshSchoolBattleScores(highscoreMode); setScreen("adminSchool"); }} className="full top-space">Skolekampen</Button></div><Button variant="light" onClick={() => setScreen("home")} className="full top-space">Tilbake</Button></Shell>;
   }
 
   if (screen === "adminNormal") {
-    const timedAdminList = isTimeChallengeMode(adminNormalMode);
-    return <Shell><div className="hero compact"><div className="icon-box icon-red"><Shield /></div><h1>Normal admin</h1><p>Slett enkeltresultater eller tøm valgt liste.</p></div><div className="card input-card"><label>Velg trinn</label>{[1, 2, 3, 4, 5, 6, 7, 8].map((grade) => <Button key={grade} variant={adminNormalGradeLevel === grade ? "primary" : "light"} onClick={() => changeAdminNormalGradeLevel(grade)} className="full top-space">{getGradeLabel(grade)}</Button>)}</div><div className="card input-card"><label>Velg regneart</label><ModeFilterButtons selectedMode={adminNormalMode} onSelect={changeAdminNormalMode} /></div><div className="card input-card"><label>Velg nivå</label><Button variant={adminNormalLevel === "easy" ? "primary" : "light"} onClick={() => changeAdminNormalLevel("easy")} className="full">Lett</Button><Button variant={adminNormalLevel === "medium" ? "primary" : "light"} onClick={() => changeAdminNormalLevel("medium")} className="full top-space">Middels</Button><Button variant={adminNormalLevel === "hard" ? "primary" : "light"} onClick={() => changeAdminNormalLevel("hard")} className="full top-space">Vanskelig</Button></div>{timedAdminList && <div className="card input-card"><label>Antall oppgaver</label>{QUESTION_COUNT_OPTIONS.map((count) => <Button key={count} variant={adminNormalQuestionCount === count ? "primary" : "light"} onClick={() => changeAdminNormalQuestionCount(count)} className="full top-space">{count} oppgaver</Button>)}</div>}<div className="card highscore-card">{scores.length === 0 ? <div className="empty-state"><h2>Ingen resultater</h2><p>Det er ingen resultater på denne listen.</p></div> : <div className="score-list">{scores.map((entry, index) => <div key={`${entry.id}-${entry.name}-${entry.score}-${index}`} className="score-row"><div className="score-name"><span className={index === 0 ? "rank rank-first" : "rank"}>{index + 1}</span><strong>{entry.name}</strong></div><div style={{ display: "flex", alignItems: "center", gap: "8px" }}><span className="score-value">{timedAdminList ? formatTime(entry.score) : entry.score}</span>{entry.id && <button type="button" className="button button-danger" onClick={() => deleteNormalScore(entry.id)} style={{ padding: "8px 10px", fontSize: "0.8rem" }}>Slett</button>}</div></div>)}</div>}</div><div className="card input-card"><p className="small-note">Valgt liste: {getGradeLabel(adminNormalGradeLevel)} · {getModeLabel(adminNormalMode)} · {getLevelLabel(adminNormalLevel)}{timedAdminList ? ` · ${adminNormalQuestionCount} oppgaver` : ""}</p><Button variant="danger" onClick={resetNormalFromAdmin} className="full">Tøm denne listen</Button>{adminMessage && <p className="admin-message">{adminMessage}</p>}</div><Button variant="light" onClick={() => setScreen("adminHome")} className="full top-space">Tilbake</Button></Shell>;
+    const hasActiveFilters =
+      adminNormalSearch.trim() ||
+      adminNormalGradeFilter !== ALL_FILTER_VALUE ||
+      adminNormalModeFilter !== ALL_FILTER_VALUE ||
+      adminNormalLevelFilter !== ALL_FILTER_VALUE ||
+      adminNormalQuestionCountFilter !== ALL_FILTER_VALUE;
+
+    return (
+      <Shell>
+        <div className="hero compact">
+          <div className="icon-box icon-red"><Shield /></div>
+          <h1>Normal admin</h1>
+          <p>Samlet oversikt over alle Normal-lister.</p>
+        </div>
+
+        <div className="card input-card">
+          <label htmlFor="admin-normal-search">Søk etter spillnavn</label>
+          <input
+            id="admin-normal-search"
+            value={adminNormalSearch}
+            onChange={(event) => setAdminNormalSearch(event.target.value)}
+            placeholder="Skriv navn, f.eks. Tiger23"
+            autoComplete="off"
+          />
+          <p className="small-note">Filtrer, finn og slett uten å måtte gå inn på hver enkelt liste.</p>
+        </div>
+
+        <div className="card input-card">
+          <label>Oversikt</label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+            <div className="status-pill green" style={{ justifyContent: "center" }}>
+              <Trophy />
+              <span>{adminNormalStats.totalResults} resultater</span>
+            </div>
+            <div className="status-pill red" style={{ justifyContent: "center" }}>
+              <Crown />
+              <span>{adminNormalStats.activeLists} lister</span>
+            </div>
+          </div>
+          <p className="small-note">
+            Beste poengsum: {adminNormalStats.bestScoreEntry ? `${adminNormalStats.bestScoreEntry.name} · ${adminNormalStats.bestScoreEntry.score} poeng` : "ingen ennå"}
+          </p>
+          <p className="small-note">
+            Beste tid: {adminNormalStats.bestTimeEntry ? `${adminNormalStats.bestTimeEntry.name} · ${formatTime(adminNormalStats.bestTimeEntry.score)}` : "ingen ennå"}
+          </p>
+        </div>
+
+        <div className="card input-card">
+          <label>Filtrer trinn</label>
+          <Button
+            variant={adminNormalGradeFilter === ALL_FILTER_VALUE ? "primary" : "light"}
+            onClick={() => setAdminNormalGradeFilter(ALL_FILTER_VALUE)}
+            className="full"
+          >
+            Alle trinn
+          </Button>
+          {GRADE_OPTIONS.map((grade) => (
+            <Button
+              key={grade}
+              variant={Number(adminNormalGradeFilter) === grade ? "primary" : "light"}
+              onClick={() => setAdminNormalGradeFilter(grade)}
+              className="full top-space"
+            >
+              {getGradeLabel(grade)}
+            </Button>
+          ))}
+        </div>
+
+        <div className="card input-card">
+          <label>Filtrer regneart</label>
+          <Button
+            variant={adminNormalModeFilter === ALL_FILTER_VALUE ? "primary" : "light"}
+            onClick={() => setAdminNormalModeFilter(ALL_FILTER_VALUE)}
+            className="full"
+          >
+            Alle regnearter
+          </Button>
+          {MODE_ORDER.map((mode) => (
+            <Button
+              key={mode}
+              variant={adminNormalModeFilter === mode ? "primary" : "light"}
+              onClick={() => setAdminNormalModeFilter(mode)}
+              className="full top-space"
+            >
+              {getModeLabel(mode)}
+            </Button>
+          ))}
+        </div>
+
+        <div className="card input-card">
+          <label>Filtrer nivå</label>
+          <Button
+            variant={adminNormalLevelFilter === ALL_FILTER_VALUE ? "primary" : "light"}
+            onClick={() => setAdminNormalLevelFilter(ALL_FILTER_VALUE)}
+            className="full"
+          >
+            Alle nivå
+          </Button>
+          {LEVEL_ORDER.map((level) => (
+            <Button
+              key={level}
+              variant={adminNormalLevelFilter === level ? "primary" : "light"}
+              onClick={() => setAdminNormalLevelFilter(level)}
+              className="full top-space"
+            >
+              {getLevelLabel(level)}
+            </Button>
+          ))}
+        </div>
+
+        <div className="card input-card">
+          <label>Filtrer antall oppgaver</label>
+          <Button
+            variant={adminNormalQuestionCountFilter === ALL_FILTER_VALUE ? "primary" : "light"}
+            onClick={() => setAdminNormalQuestionCountFilter(ALL_FILTER_VALUE)}
+            className="full"
+          >
+            Alle / poengmoduser
+          </Button>
+          {QUESTION_COUNT_OPTIONS.map((count) => (
+            <Button
+              key={count}
+              variant={Number(adminNormalQuestionCountFilter) === count ? "primary" : "light"}
+              onClick={() => setAdminNormalQuestionCountFilter(count)}
+              className="full top-space"
+            >
+              {count} oppgaver
+            </Button>
+          ))}
+          <p className="small-note">Antall oppgaver gjelder addisjon og subtraksjon. Multiplikasjon og divisjon vises under “Alle / poengmoduser”.</p>
+        </div>
+
+        {hasActiveFilters && (
+          <Button variant="light" onClick={clearNormalAdminFilters} className="full top-space">
+            Nullstill søk og filtre
+          </Button>
+        )}
+
+        {adminMessage && <p className="admin-message">{adminMessage}</p>}
+
+        {adminNormalGroups.length === 0 ? (
+          <div className="card highscore-card">
+            <div className="empty-state">
+              <h2>Ingen resultater funnet</h2>
+              <p>Prøv å endre søket eller filtrene.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="stack">
+            {adminNormalGroups.map((group) => {
+              const groupIsTimed = isTimeChallengeMode(group.mode);
+              return (
+                <div key={group.key} className="card highscore-card">
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "flex-start", marginBottom: "10px" }}>
+                    <div>
+                      <h2 className="result-highscore-title" style={{ textAlign: "left", marginBottom: "2px" }}>{getNormalAdminGroupTitle(group)}</h2>
+                      <p className="small-note">{group.entries.length} resultat{group.entries.length === 1 ? "" : "er"} på listen</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="button button-danger"
+                      onClick={() => resetNormalAdminGroup(group)}
+                      style={{ padding: "8px 10px", fontSize: "0.78rem", flexShrink: 0 }}
+                    >
+                      Tøm
+                    </button>
+                  </div>
+
+                  <div className="score-list">
+                    {group.entries.map((entry, index) => (
+                      <div key={`${entry.id || "local"}-${entry.name}-${entry.score}-${index}`} className="score-row">
+                        <div className="score-name">
+                          <span className={index === 0 ? "rank rank-first" : "rank"}>{index + 1}</span>
+                          <strong>{entry.name}</strong>
+                          <small>{getNormalAdminGroupTitle(group)}</small>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span className="score-value">{groupIsTimed ? formatTime(entry.score) : entry.score}</span>
+                          {entry.id && (
+                            <button
+                              type="button"
+                              className="button button-danger"
+                              onClick={() => deleteNormalScore(entry.id)}
+                              style={{ padding: "8px 10px", fontSize: "0.8rem" }}
+                            >
+                              Slett
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <Button variant="light" onClick={() => setScreen("adminHome")} className="full top-space">Tilbake</Button>
+      </Shell>
+    );
   }
 
   if (screen === "adminSchool") {
