@@ -901,6 +901,13 @@ function BossBattleStyles() {
       @keyframes shadow-wisp-drift { 0%, 100% { transform: translateY(0) rotate(0deg); opacity: .34; } 50% { transform: translateY(-8px) rotate(5deg); opacity: .72; } }
       @keyframes hit-flash-pop { 0% { opacity: 0; transform: scale(.86); } 28% { opacity: .72; transform: scale(1.05); } 100% { opacity: 0; transform: scale(1.18); } }
       @keyframes weak-stress { 0%, 100% { transform: translateX(0); } 30% { transform: translateX(-1.5px); } 65% { transform: translateX(1.5px); } }
+      @keyframes battle-screen-shake { 0%, 100% { transform: translateX(0); } 18% { transform: translateX(-3px); } 36% { transform: translateX(3px); } 54% { transform: translateX(-2px); } 72% { transform: translateX(2px); } }
+      @keyframes arena-danger-pulse { 0%, 100% { box-shadow: inset 0 -18px 34px rgba(15, 23, 42, 0.16), 0 16px 34px rgba(15, 23, 42, 0.2); } 50% { box-shadow: inset 0 -20px 38px rgba(127, 29, 29, 0.2), 0 18px 38px rgba(127, 29, 29, 0.22); } }
+      @keyframes super-ring-surge { 0%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(.9); } 45% { opacity: .64; transform: translate(-50%, -50%) scale(1.08); } }
+      @keyframes damage-heavy-pop { 0% { transform: translate(-50%, 16px) scale(.55) rotate(-3deg); opacity: 0; } 18% { transform: translate(-50%, -8px) scale(1.38) rotate(2deg); opacity: 1; } 56% { transform: translate(-50%, -23px) scale(1.1) rotate(-1deg); opacity: 1; } 100% { transform: translate(-50%, -48px) scale(.9) rotate(0deg); opacity: 0; } }
+      @keyframes hp-shine { 0% { transform: translateX(-70%); opacity: .35; } 100% { transform: translateX(120%); opacity: .82; } }
+      @keyframes hp-danger-throb { 0%, 100% { filter: saturate(1.1) brightness(1); } 50% { filter: saturate(1.55) brightness(1.18); } }
+      @keyframes super-meter-ready { 0%, 100% { filter: drop-shadow(0 0 0 rgba(251, 191, 36, 0)); } 50% { filter: drop-shadow(0 0 12px rgba(251, 191, 36, .9)); } }
       .play-compact-layout { display: flex; flex-direction: column; gap: 10px; }
       .status-row.play-status-compact { gap: 8px; margin-bottom: 0; }
       .status-row.play-status-compact .status-pill { padding: 9px 12px; min-height: 42px; border-radius: 16px; font-size: .95rem; }
@@ -914,9 +921,15 @@ function BossBattleStyles() {
       .feedback-area.play-feedback-compact .feedback { margin: 2px 0 0; font-size: .9rem; }
       .play-compact-layout .quit-round-button { margin-top: 2px; }
       .boss-play-layout { display: flex; flex-direction: column; gap: 10px; }
+      .boss-play-layout.player-under-attack { animation: battle-screen-shake .38s ease; }
       .boss-arena { border-radius: 24px; padding: 12px 12px 13px; color: #0f172a; box-shadow: inset 0 -18px 34px rgba(15, 23, 42, 0.11), 0 16px 34px rgba(15, 23, 42, 0.18); position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,.62); isolation: isolate; }
       .boss-arena::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 14%, rgba(255,255,255,.78), rgba(255,255,255,.18) 34%, transparent 58%), radial-gradient(ellipse at 50% 78%, rgba(15,23,42,.18), transparent 46%), linear-gradient(180deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 48%, rgba(15,23,42,.18) 100%); pointer-events: none; }
       .boss-arena::after { content: ""; position: absolute; inset: -18px; background: radial-gradient(circle at 18% 28%, rgba(255,255,255,.45) 0 4px, transparent 5px), radial-gradient(circle at 74% 22%, rgba(255,255,255,.28) 0 5px, transparent 6px), radial-gradient(circle at 82% 74%, rgba(255,255,255,.34) 0 3px, transparent 4px), radial-gradient(circle at 34% 82%, rgba(255,255,255,.25) 0 6px, transparent 7px); animation: arena-drift 5.5s ease-in-out infinite; pointer-events: none; opacity: .9; }
+      .boss-arena.boss-phase-angry::before { background: radial-gradient(ellipse at 50% 14%, rgba(255,255,255,.68), rgba(254,240,138,.18) 34%, transparent 58%), radial-gradient(ellipse at 50% 78%, rgba(127,29,29,.16), transparent 46%), linear-gradient(180deg, rgba(255,255,255,.14) 0%, rgba(255,255,255,0) 46%, rgba(127,29,29,.2) 100%); }
+      .boss-arena.boss-phase-weak { animation: arena-danger-pulse 1.45s ease-in-out infinite; }
+      .boss-arena.boss-phase-weak::before { background: radial-gradient(ellipse at 50% 14%, rgba(255,255,255,.55), rgba(248,113,113,.18) 36%, transparent 58%), radial-gradient(ellipse at 50% 78%, rgba(127,29,29,.3), transparent 48%), linear-gradient(180deg, rgba(255,255,255,.1) 0%, rgba(255,255,255,0) 42%, rgba(69,10,10,.28) 100%); }
+      .boss-arena.super-ready::after { opacity: 1; filter: saturate(1.25) brightness(1.08); }
+      .boss-arena.super-impact::before { background: radial-gradient(ellipse at 50% 44%, rgba(254,243,199,.95), rgba(251,191,36,.28) 26%, transparent 62%), radial-gradient(ellipse at 50% 78%, rgba(245,158,11,.24), transparent 48%), linear-gradient(180deg, rgba(255,255,255,.2), rgba(251,191,36,.18)); }
       .boss-arena-inner { position: relative; z-index: 1; }
       .boss-topline { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
       .boss-name-title { font-weight: 900; font-size: 1.05rem; line-height: 1; }
@@ -925,13 +938,16 @@ function BossBattleStyles() {
       .boss-stage { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; min-height: 124px; padding: 2px 0 8px; isolation: isolate; perspective: 520px; }
       .boss-stage::before { content: ""; position: absolute; left: 7%; right: 7%; bottom: 1px; height: 48px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(255,255,255,.72) 0%, rgba(255,255,255,.36) 38%, rgba(15,23,42,.16) 74%, rgba(15,23,42,0) 100%); transform: rotateX(62deg); transform-origin: center bottom; z-index: 0; }
       .boss-stage::after { content: ""; position: absolute; top: 2px; left: 50%; width: 190px; height: 92px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(255,255,255,.48), rgba(255,255,255,.16) 42%, rgba(255,255,255,0) 72%); transform: translateX(-50%); z-index: 0; pointer-events: none; }
+      .boss-stage.super-ready::after { animation: super-ring-surge 1.05s ease-in-out infinite; background: radial-gradient(ellipse at center, rgba(254,243,199,.78), rgba(251,191,36,.3) 38%, rgba(255,255,255,0) 72%); }
+      .boss-stage.super-impact::after { opacity: .82; background: radial-gradient(ellipse at center, rgba(254,243,199,.96), rgba(251,191,36,.46) 34%, rgba(255,255,255,0) 72%); }
       .boss-figure-wrap { position: relative; z-index: 2; width: 145px; height: 92px; display: grid; place-items: center; margin-bottom: -2px; animation: boss-float 2.5s ease-in-out infinite; transform-origin: center bottom; transition: transform .2s ease; }
       .boss-figure-wrap.hit { animation: boss-hit-shake .42s ease; }
       .boss-svg { width: 145px; height: 100px; overflow: visible; filter: drop-shadow(0 12px 13px rgba(15,23,42,.31)) drop-shadow(0 2px 2px rgba(255,255,255,.32)); }
+      .boss-svg-shadow { width: 158px; height: 112px; filter: drop-shadow(0 12px 13px rgba(2,6,23,.38)) drop-shadow(0 0 10px rgba(248,113,113,.26)); }
       .boss-svg .boss-body-main { transform-box: fill-box; transform-origin: center bottom; animation: boss-breathe 2.2s ease-in-out infinite; }
       .boss-svg-slime .boss-body-main { animation-name: slime-squash; animation-duration: 2.25s; }
       .boss-svg-troll .boss-body-main { animation-name: troll-stomp; animation-duration: 2.85s; }
-      .boss-svg-shadow .boss-body-main { animation-name: shadow-hover; animation-duration: 2.65s; }
+      .boss-svg-shadow .boss-body-main { animation-name: boss-breathe; animation-duration: 2.65s; opacity: 1; }
       .boss-svg .boss-eye { transform-box: fill-box; transform-origin: center; animation: boss-eye-blink 4.4s ease-in-out infinite; }
       .boss-svg .boss-aura { transform-box: fill-box; transform-origin: center; animation: aura-pulse 2.4s ease-in-out infinite; }
       .boss-svg .slime-drip { transform-box: fill-box; transform-origin: center top; animation: goo-wiggle 2.1s ease-in-out infinite; }
@@ -939,6 +955,7 @@ function BossBattleStyles() {
       .boss-svg .troll-crown { transform-box: fill-box; transform-origin: center bottom; animation: crown-wobble 2.8s ease-in-out infinite; }
       .boss-svg .golem-core { transform-box: fill-box; transform-origin: center; animation: core-pulse 1.6s ease-in-out infinite; }
       .boss-svg .shadow-wisp { transform-box: fill-box; transform-origin: center; animation: shadow-wisp-drift 3.2s ease-in-out infinite; }
+      .boss-svg .shadow-mist-back { opacity: .26; }
       .boss-svg .boss-hit-flash { opacity: 0; transform-box: fill-box; transform-origin: center; pointer-events: none; }
       .boss-svg.boss-action-hit .boss-hit-flash { animation: hit-flash-pop .42s ease-out; }
       .boss-svg.boss-action-hit .boss-body-main, .boss-svg.boss-action-hit .boss-head { filter: brightness(1.45) saturate(1.5); }
@@ -954,25 +971,35 @@ function BossBattleStyles() {
       .boss-attack-effect.attack-slime { color: #14532d; }
       .boss-attack-effect.attack-troll { color: #78350f; }
       .boss-attack-effect.attack-shadow { color: #7f1d1d; }
+      .boss-arena.boss-attacking .boss-attack-effect { background: #fff1f2; border-color: rgba(248,113,113,.7); box-shadow: 0 0 0 5px rgba(239,68,68,.14), 0 14px 28px rgba(127,29,29,.28); }
       .boss-result-figure { width: 230px; height: 165px; margin: 0 auto 12px; display: grid; place-items: center; }
       .boss-result-figure .boss-svg { width: 225px; height: 160px; }
-      .boss-shadow { position: relative; z-index: 1; width: 108px; height: 14px; margin-top: -8px; border-radius: 999px; background: radial-gradient(ellipse at center, rgba(15,23,42,.36), rgba(15,23,42,.16) 48%, rgba(15,23,42,0) 74%); filter: blur(2px); transform: rotateX(58deg); opacity: .88; }
-      .damage-popup { position: absolute; top: 28px; left: 50%; transform: translateX(-50%); font-size: 1.55rem; font-weight: 1000; color: #dc2626; text-shadow: 0 3px 0 rgba(255,255,255,.85), 0 6px 14px rgba(0,0,0,.22); animation: damage-pop .8s ease-out forwards; pointer-events: none; z-index: 5; }
-      .damage-popup.super { color: #f59e0b; font-size: 1.75rem; text-shadow: 0 3px 0 rgba(255,255,255,.9), 0 0 18px rgba(251,191,36,.86), 0 8px 18px rgba(0,0,0,.24); }
-      .boss-hp-wrap { background: rgba(255,255,255,.72); border-radius: 14px; padding: 7px; border: 1px solid rgba(255,255,255,.8); }
+      .boss-shadow { position: relative; z-index: 1; width: 108px; height: 14px; margin-top: -8px; border-radius: 999px; background: radial-gradient(ellipse at center, rgba(15,23,42,.36), rgba(15,23,42,.16) 48%, rgba(15,23,42,0) 74%); filter: blur(2px); transform: rotateX(58deg); opacity: .88; transition: width .2s ease, opacity .2s ease; }
+      .boss-stage-troll .boss-shadow { width: 122px; opacity: .94; }
+      .boss-stage-shadow .boss-shadow { background: radial-gradient(ellipse at center, rgba(2,6,23,.48), rgba(127,29,29,.2) 48%, rgba(15,23,42,0) 76%); }
+      .boss-arena.boss-phase-weak .boss-shadow { width: 116px; opacity: 1; }
+      .damage-popup { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); font-size: 1.65rem; font-weight: 1000; color: #dc2626; padding: 2px 9px; border-radius: 999px; background: rgba(255,255,255,.44); text-shadow: 0 3px 0 rgba(255,255,255,.9), 0 6px 14px rgba(0,0,0,.24); animation: damage-pop .82s ease-out forwards; pointer-events: none; z-index: 5; }
+      .damage-popup.super { color: #f59e0b; font-size: 2rem; background: rgba(255,251,235,.72); box-shadow: 0 0 0 6px rgba(251,191,36,.16), 0 0 26px rgba(251,191,36,.72); text-shadow: 0 3px 0 rgba(255,255,255,.95), 0 0 18px rgba(251,191,36,.86), 0 8px 18px rgba(0,0,0,.24); animation: damage-heavy-pop .98s ease-out forwards; }
+      .boss-hp-wrap { background: rgba(255,255,255,.76); border-radius: 16px; padding: 8px; border: 1px solid rgba(255,255,255,.86); box-shadow: inset 0 1px 0 rgba(255,255,255,.75), 0 8px 16px rgba(15,23,42,.1); }
       .boss-hp-label { display: flex; justify-content: space-between; font-weight: 900; font-size: .78rem; margin-bottom: 5px; }
-      .boss-hp-bar { height: 13px; border-radius: 999px; background: rgba(15, 23, 42, .16); overflow: hidden; border: 2px solid rgba(255,255,255,.8); }
-      .boss-hp-fill { height: 100%; border-radius: 999px; transition: width .35s ease; background: linear-gradient(90deg, #22c55e, #eab308, #ef4444); }
-      .player-panel { background: white; border-radius: 20px; padding: 10px 12px; box-shadow: 0 10px 22px rgba(15, 23, 42, .09); border: 1px solid rgba(226,232,240,.9); }
-      .player-panel.hit { animation: player-hit-shake .35s ease; background: #fff1f2; }
+      .boss-hp-bar { height: 16px; border-radius: 999px; background: linear-gradient(180deg, rgba(15,23,42,.28), rgba(15,23,42,.12)); overflow: hidden; border: 2px solid rgba(255,255,255,.88); box-shadow: inset 0 3px 7px rgba(15,23,42,.22); position: relative; }
+      .boss-hp-bar::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, rgba(255,255,255,.34) 0 2px, transparent 2px 13px); mix-blend-mode: soft-light; pointer-events: none; }
+      .boss-hp-fill { position: relative; height: 100%; border-radius: 999px; overflow: hidden; transition: width .35s ease; background: linear-gradient(90deg, #22c55e 0%, #84cc16 44%, #facc15 66%, #f97316 84%, #ef4444 100%); box-shadow: inset 0 2px 3px rgba(255,255,255,.45), inset 0 -4px 6px rgba(15,23,42,.2), 0 0 12px rgba(34,197,94,.28); }
+      .boss-hp-fill::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 58%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.62), transparent); animation: hp-shine 1.7s ease-in-out infinite; }
+      .boss-arena.boss-phase-angry .boss-hp-fill { box-shadow: inset 0 2px 3px rgba(255,255,255,.45), inset 0 -4px 6px rgba(15,23,42,.2), 0 0 15px rgba(249,115,22,.42); }
+      .boss-arena.boss-phase-weak .boss-hp-fill { background: linear-gradient(90deg, #f97316, #ef4444, #991b1b); box-shadow: inset 0 2px 3px rgba(255,255,255,.35), inset 0 -4px 6px rgba(15,23,42,.26), 0 0 18px rgba(239,68,68,.62); animation: hp-danger-throb .82s ease-in-out infinite; }
+      .player-panel { background: white; border-radius: 20px; padding: 10px 12px; box-shadow: 0 10px 22px rgba(15, 23, 42, .09); border: 1px solid rgba(226,232,240,.9); position: relative; overflow: hidden; }
+      .player-panel.hit { animation: player-hit-shake .35s ease; background: #fff1f2; border-color: rgba(248,113,113,.55); box-shadow: 0 0 0 5px rgba(239,68,68,.08), 0 12px 24px rgba(127,29,29,.13); }
+      .player-panel.hit::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 18% 50%, rgba(239,68,68,.18), transparent 42%); pointer-events: none; }
       .boss-compact-status { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px; }
       .heart-row { display: flex; justify-content: flex-start; gap: 5px; margin-bottom: 0; font-size: 1.25rem; line-height: 1; }
       .heart-lost { opacity: .25; filter: grayscale(1); transform: scale(.86); }
       .super-area { min-width: 0; }
       .super-meter { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; align-items: center; }
-      .super-cell { height: 10px; border-radius: 999px; background: #e2e8f0; border: 1px solid rgba(148,163,184,.6); transition: all .18s ease; }
+      .super-meter.ready { animation: super-meter-ready .82s ease-in-out infinite; }
+      .super-cell { height: 10px; border-radius: 999px; background: #e2e8f0; border: 1px solid rgba(148,163,184,.6); transition: all .18s ease; box-shadow: inset 0 1px 0 rgba(255,255,255,.65); }
       .super-cell.filled { background: linear-gradient(90deg, #facc15, #f97316); border-color: #f59e0b; }
-      .super-cell.ready { animation: super-pulse .7s ease-in-out infinite; }
+      .super-cell.ready { animation: super-pulse .7s ease-in-out infinite; background: linear-gradient(180deg, #f8fafc, #e2e8f0); border-color: #f59e0b; box-shadow: 0 0 18px rgba(251,191,36,.75), inset 0 1px 0 rgba(255,255,255,.7); }
       .super-meter-label { display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: .72rem; margin-bottom: 5px; }
       .boss-question-card { margin-top: 0; padding-top: 12px; padding-bottom: 12px; }
       .boss-question-card h2 { font-size: 2.1rem; line-height: 1; margin: 6px 0 2px; }
@@ -1109,7 +1136,7 @@ function ShadowGolemSvg({ hpPercent, action = "idle", mood = "confident", defeat
         <radialGradient id="golemDarkMist2" cx="50%" cy="50%" r="70%"><stop offset="0%" stopColor="#7f1d1d" stopOpacity=".45" /><stop offset="55%" stopColor="#111827" stopOpacity=".35" /><stop offset="100%" stopColor="#020617" stopOpacity="0" /></radialGradient>
       </defs>
       <ellipse cx="140" cy="188" rx="98" ry="14" fill="rgba(2,6,23,.32)" />
-      <ellipse className="shadow-wisp" cx="140" cy="126" rx="116" ry="76" fill="url(#golemDarkMist2)" />
+      <ellipse className="shadow-mist-back" cx="140" cy="126" rx="116" ry="76" fill="url(#golemDarkMist2)" />
       <circle className="boss-aura" cx="140" cy="112" r="86" fill="url(#golemAura2)" />
       <circle className="boss-hit-flash" cx="140" cy="115" r="102" fill="#fed7aa" />
       <path className="shadow-wisp" d="M58 84 C33 88 26 118 42 136 C31 136 22 128 20 115 C18 96 34 79 58 84Z" fill="#020617" opacity=".45" />
@@ -1520,8 +1547,8 @@ export default function App() {
   }
 
   if (screen === "bossPlay") {
-    const boss = getBossConfig(bossId); const hpPercent = bossMaxLives > 0 ? Math.max(0, Math.min(100, (bossLives / bossMaxLives) * 100)) : 0; const isSuperReady = currentStreak === 4; const bossAction = bossHit ? "hit" : playerHit ? "attack" : "idle";
-    return <Shell><div className="boss-play-layout"><div className="boss-arena" style={{ background: boss.gradient }}><div className="boss-arena-inner"><div className="boss-topline"><div><div className="boss-arena-name">{boss.arena}</div><div className="boss-name-title">{boss.name}</div></div><div className="boss-badge">{boss.shortIcon}</div></div><div className="boss-stage"><div className={`boss-figure-wrap ${bossHit ? "hit" : ""}`}><BossFigure bossId={bossId} hpPercent={hpPercent} action={bossAction} /></div>{playerHit && <div className={`boss-attack-effect attack-${boss.id}`}>{getBossAttackName(boss.id)}</div>}{damagePopup && <div className={`damage-popup ${damagePopup.super ? "super" : ""}`}>{damagePopup.text}</div>}<div className="boss-shadow" /></div><div className="boss-hp-wrap"><div className="boss-hp-label"><span>Boss-liv</span><span>{bossLives}/{bossMaxLives}</span></div><div className="boss-hp-bar"><div className="boss-hp-fill" style={{ width: `${hpPercent}%` }} /></div></div></div></div><div className={`player-panel ${playerHit ? "hit" : ""}`}><div className="boss-compact-status"><div className="heart-row">{Array.from({ length: playerMaxHearts }).map((_, index) => <span key={index} className={index < playerHearts ? "" : "heart-lost"}>❤️</span>)}</div><div className="super-area"><div className="super-meter-label"><span>Super</span><span>{currentStreak}/5</span></div><div className="super-meter">{Array.from({ length: 5 }).map((_, index) => <div key={index} className={`super-cell ${index < currentStreak ? "filled" : ""} ${isSuperReady && index === 4 ? "ready" : ""}`} />)}</div></div></div></div><div className="card question-card boss-question-card"><p className="label">Velg riktig svar</p><h2>{question.a} {question.symbol} {question.b} = ?</h2></div><div className="answer-grid">{question.options.map((option) => { let answerClass = "answer-button"; if (feedback === "correct" && option === question.correct) answerClass += " correct"; if (feedback === "wrong" && option !== question.correct) answerClass += " wrong"; if (feedback === "wrong" && option === question.correct) answerClass += " correct"; return <button key={option} onClick={() => answerBoss(option)} disabled={Boolean(feedback)} className={answerClass}>{option}</button>; })}</div><div className="feedback-area boss-feedback-area">{feedback === "correct" && <p className="feedback correct-text">{bossMessage}</p>}{feedback === "wrong" && <p className="feedback wrong-text">{bossMessage}</p>}{!feedback && <p className="feedback neutral-text">{isSuperReady ? "Neste riktige svar gir superangrep!" : bossMessage || "Slå bossen før du mister alle hjertene!"}</p>}</div><Button variant="light" onClick={quitBossBattle} className="full quit-round-button">Avslutt runde</Button></div></Shell>;
+    const boss = getBossConfig(bossId); const hpPercent = bossMaxLives > 0 ? Math.max(0, Math.min(100, (bossLives / bossMaxLives) * 100)) : 0; const visualPhase = getBossMood(hpPercent); const isSuperReady = currentStreak === 4; const isSuperImpact = Boolean(damagePopup?.super); const bossAction = bossHit ? "hit" : playerHit ? "attack" : "idle";
+    return <Shell><div className={`boss-play-layout ${playerHit ? "player-under-attack" : ""} ${isSuperImpact ? "super-impact" : ""}`}><div className={`boss-arena boss-theme-${boss.id} boss-phase-${visualPhase} ${isSuperReady ? "super-ready" : ""} ${isSuperImpact ? "super-impact" : ""} ${playerHit ? "boss-attacking" : ""}`} style={{ background: boss.gradient }}><div className="boss-arena-inner"><div className="boss-topline"><div><div className="boss-arena-name">{boss.arena}</div><div className="boss-name-title">{boss.name}</div></div><div className="boss-badge">{boss.shortIcon}</div></div><div className={`boss-stage boss-stage-${boss.id} boss-stage-${visualPhase} ${isSuperReady ? "super-ready" : ""} ${isSuperImpact ? "super-impact" : ""}`}><div className={`boss-figure-wrap ${bossHit ? "hit" : ""}`}><BossFigure bossId={bossId} hpPercent={hpPercent} action={bossAction} /></div>{playerHit && <div className={`boss-attack-effect attack-${boss.id}`}>{getBossAttackName(boss.id)}</div>}{damagePopup && <div className={`damage-popup ${damagePopup.super ? "super" : ""}`}>{damagePopup.text}</div>}<div className="boss-shadow" /></div><div className="boss-hp-wrap"><div className="boss-hp-label"><span>Boss-liv</span><span>{bossLives}/{bossMaxLives}</span></div><div className="boss-hp-bar"><div className="boss-hp-fill" style={{ width: `${hpPercent}%` }} /></div></div></div></div><div className={`player-panel ${playerHit ? "hit" : ""}`}><div className="boss-compact-status"><div className="heart-row">{Array.from({ length: playerMaxHearts }).map((_, index) => <span key={index} className={index < playerHearts ? "" : "heart-lost"}>❤️</span>)}</div><div className="super-area"><div className="super-meter-label"><span>Super</span><span>{currentStreak}/5</span></div><div className={`super-meter ${isSuperReady ? "ready" : ""}`}>{Array.from({ length: 5 }).map((_, index) => <div key={index} className={`super-cell ${index < currentStreak ? "filled" : ""} ${isSuperReady && index === 4 ? "ready" : ""}`} />)}</div></div></div></div><div className="card question-card boss-question-card"><p className="label">Velg riktig svar</p><h2>{question.a} {question.symbol} {question.b} = ?</h2></div><div className="answer-grid">{question.options.map((option) => { let answerClass = "answer-button"; if (feedback === "correct" && option === question.correct) answerClass += " correct"; if (feedback === "wrong" && option !== question.correct) answerClass += " wrong"; if (feedback === "wrong" && option === question.correct) answerClass += " correct"; return <button key={option} onClick={() => answerBoss(option)} disabled={Boolean(feedback)} className={answerClass}>{option}</button>; })}</div><div className="feedback-area boss-feedback-area">{feedback === "correct" && <p className="feedback correct-text">{bossMessage}</p>}{feedback === "wrong" && <p className="feedback wrong-text">{bossMessage}</p>}{!feedback && <p className="feedback neutral-text">{isSuperReady ? "Neste riktige svar gir superangrep!" : bossMessage || "Slå bossen før du mister alle hjertene!"}</p>}</div><Button variant="light" onClick={quitBossBattle} className="full quit-round-button">Avslutt runde</Button></div></Shell>;
   }
 
   if (screen === "bossResult") {
