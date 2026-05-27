@@ -8,6 +8,10 @@ const TIME_PENALTY_SECONDS = 5;
 const SCHOOL_BATTLE_TIME_QUESTION_COUNT = 25;
 const QUESTION_COUNT_OPTIONS = [10, 20, 30, 40];
 const STORAGE_KEY = "gangemester_highscores_v1";
+const PENDING_HIGHSCORE_KEY = "regnemester_pending_highscores_v1";
+const HIGHSCORE_SAVE_PENDING_MESSAGE = "Runden er fullført, men resultatet kunne ikke lagres på highscore akkurat nå. Appen prøver igjen automatisk.";
+const HIGHSCORE_LOAD_FAILED_MESSAGE = "Highscore-listen kunne ikke lastes akkurat nå.";
+const PENDING_HIGHSCORE_SAVED_MESSAGE = "Tidligere resultat ble lagret på highscore.";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
@@ -545,6 +549,122 @@ function sortSchoolBattleScores(scores, mode = "multiplication") {
     }))
     .sort((a, b) => (isTimed ? a.score - b.score : b.score - a.score))
     .slice(0, 20);
+}
+
+let pendingHighscoreRetryInFlight = false;
+
+function makeLocalId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function getHighscoreGameType(type) {
+  return type === "school_battle_score" || type === "school_battle_time" ? "school_battle" : "normal";
+}
+
+function getPendingHighscoreFingerprint(type, entry) {
+  return [
+    type,
+    getHighscoreGameType(type),
+    entry.name || entry.playerName || "",
+    Number(entry.score),
+    entry.mode || "",
+    entry.level || "",
+    Number(entry.grade_level || 0),
+    Number(entry.question_count || 0),
+    entry.school || "",
+    entry.grade_group || "",
+  ].join("|");
+}
+
+function readPendingHighscores() {
+  try {
+    const raw = localStorage.getItem(PENDING_HIGHSCORE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((entry) => entry && entry.type && Number.isFinite(Number(entry.score))) : [];
+  } catch (error) {
+    console.error("[Regnemester highscore] Kunne ikke lese pending highscore-ko.", { error });
+    return [];
+  }
+}
+
+function writePendingHighscores(entries) {
+  try {
+    localStorage.setItem(PENDING_HIGHSCORE_KEY, JSON.stringify(entries.slice(-50)));
+  } catch (error) {
+    console.error("[Regnemester highscore] Kunne ikke skrive pending highscore-ko.", { error });
+  }
+}
+
+function queuePendingHighscore(type, entry) {
+  const pending = {
+    id: makeLocalId(),
+    type,
+    game_type: getHighscoreGameType(type),
+    name: entry.name || entry.playerName || "",
+    score: Number(entry.score),
+    mode: entry.mode,
+    level: entry.level,
+    grade_level: entry.grade_level,
+    question_count: entry.question_count,
+    school: entry.school,
+    grade_group: entry.grade_group,
+    createdAt: new Date().toISOString(),
+  };
+  pending.fingerprint = getPendingHighscoreFingerprint(type, pending);
+  const current = readPendingHighscores();
+  if (current.some((item) => item.fingerprint === pending.fingerprint)) return pending;
+  writePendingHighscores([...current, pending]);
+  return pending;
+}
+
+function logHighscoreError(stage, context, error) {
+  console.error("[Regnemester highscore]", {
+    stage,
+    game_type: context?.game_type || getHighscoreGameType(context?.type),
+    mode: context?.mode,
+    operation: context?.mode,
+    level: context?.level,
+    grade_level: context?.grade_level,
+    question_count: context?.question_count,
+    school: context?.school,
+    grade_group: context?.grade_group,
+    playerName: context?.name || context?.playerName,
+    score: context?.score,
+    error,
+  });
+}
+
+async function saveHighscoreEntry(type, entry) {
+  if (type === "normal_time") return saveTimeScore(entry);
+  if (type === "school_battle_score") return saveSchoolBattleScore(entry);
+  if (type === "school_battle_time") return saveSchoolBattleTimeScore(entry);
+  return saveScore(entry);
+}
+
+async function retryPendingHighscores(context = {}) {
+  const pending = readPendingHighscores();
+  if (pendingHighscoreRetryInFlight || pending.length === 0) return { savedCount: 0, failedCount: 0 };
+  pendingHighscoreRetryInFlight = true;
+  const remaining = [];
+  let savedCount = 0;
+  let failedCount = 0;
+  try {
+    for (const item of pending) {
+      try {
+        await saveHighscoreEntry(item.type, item);
+        savedCount += 1;
+      } catch (error) {
+        failedCount += 1;
+        logHighscoreError("retry", { ...item, retrySource: context.source }, error);
+        remaining.push({ ...item, retryCount: Number(item.retryCount || 0) + 1, lastRetryAt: new Date().toISOString() });
+      }
+    }
+    writePendingHighscores(remaining);
+    return { savedCount, failedCount };
+  } finally {
+    pendingHighscoreRetryInFlight = false;
+  }
 }
 
 async function loadScores(mode = "multiplication", level = "medium", gradeLevel = 4, questionCount = 10) {
@@ -1473,7 +1593,17 @@ export default function App() {
   );
   const adminNormalStats = useMemo(() => getNormalAdminStats(adminNormalScores), [adminNormalScores]);
 
-  useEffect(() => { refreshScores("addition", "medium", 4, 10); }, []);
+  useEffect(() => {
+    refreshScores("addition", "medium", 4, 10);
+    retryPendingAndNotify("app-start");
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handleOnline = () => retryPendingAndNotify("online");
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, []);
 
   useEffect(() => {
     if (screen !== "play") return;
@@ -1490,11 +1620,42 @@ export default function App() {
   }, [screen, timeLeft, elapsedSeconds, isCurrentTimeChallenge]);
 
   async function refreshScores(mode = highscoreMode, level = highscoreLevel, gradeLevel = highscoreGradeLevel, questionCount = highscoreQuestionCount) {
-    try { const loaded = await loadScores(mode, level, gradeLevel, questionCount); setScores(loaded); setScoreMessage(""); return loaded; } catch (error) { setScoreMessage(error.message); return []; }
+    try { const loaded = await loadScores(mode, level, gradeLevel, questionCount); setScores(loaded); setScoreMessage(""); return loaded; } catch (error) { logHighscoreError("henting", { type: "normal_score", game_type: "normal", mode, level, grade_level: gradeLevel, question_count: questionCount }, error); setScoreMessage(HIGHSCORE_LOAD_FAILED_MESSAGE); return []; }
   }
 
   async function refreshSchoolBattleScores(mode = highscoreMode, gradeGroup = highscoreGradeGroup) {
-    try { const loaded = await loadSchoolBattleScores(mode, gradeGroup); setScores(loaded); setScoreMessage(""); return loaded; } catch (error) { setScoreMessage(error.message); return []; }
+    try { const loaded = await loadSchoolBattleScores(mode, gradeGroup); setScores(loaded); setScoreMessage(""); return loaded; } catch (error) { logHighscoreError("henting", { type: "school_battle_score", game_type: "school_battle", mode, grade_group: gradeGroup }, error); setScoreMessage(HIGHSCORE_LOAD_FAILED_MESSAGE); return []; }
+  }
+
+  async function retryPendingAndNotify(source = "manual") {
+    const result = await retryPendingHighscores({ source });
+    if (result.savedCount > 0) {
+      setScoreMessage((current) => current ? `${current} ${PENDING_HIGHSCORE_SAVED_MESSAGE}` : PENDING_HIGHSCORE_SAVED_MESSAGE);
+    }
+    return result;
+  }
+
+  async function saveRoundHighscore({ type, entry, baseMessage, loadScoresForResult, loadContext, applyHighscoreContext }) {
+    applyHighscoreContext();
+    const messages = [baseMessage];
+    try {
+      const saveResult = await saveHighscoreEntry(type, entry);
+      messages.push(saveResult.message);
+    } catch (error) {
+      logHighscoreError("lagring", { ...entry, type, game_type: getHighscoreGameType(type) }, error);
+      queuePendingHighscore(type, entry);
+      messages.push(HIGHSCORE_SAVE_PENDING_MESSAGE);
+    }
+    try {
+      const loaded = await loadScoresForResult();
+      setScores(loaded);
+      setResultScores(loaded);
+    } catch (error) {
+      logHighscoreError("henting", loadContext, error);
+      setResultScores([]);
+      messages.push(HIGHSCORE_LOAD_FAILED_MESSAGE);
+    }
+    setScoreMessage(messages.filter(Boolean).join(" "));
   }
 
   function openHighscore(mode = gameMode, level = gameLevel, gradeLevel = gameGradeLevel, questionCount = gameQuestionCount) {
@@ -1545,25 +1706,56 @@ export default function App() {
     const finalWrongAnswers = Number.isFinite(resultOverride.wrongAnswers) ? resultOverride.wrongAnswers : wrongAnswers;
     const finalTime = Number.isFinite(resultOverride.timeSeconds) ? resultOverride.timeSeconds : elapsedSeconds + finalWrongAnswers * TIME_PENALTY_SECONDS;
     setScreen("result"); setFeedback(null);
+    retryPendingAndNotify("round-finished");
     if (isCurrentTimeChallenge) { setResultTimeSeconds(finalTime); setResultCorrectAnswers(finalScore); setResultWrongAnswers(finalWrongAnswers); }
     if (!savedThisRound.current && trimmedName) {
       savedThisRound.current = true;
-      try {
-        if (gameType === "school_battle" && isCurrentTimeChallenge) {
-          const saveResult = await saveSchoolBattleTimeScore({ name: trimmedName.slice(0, 18), score: finalTime, mode: gameMode, school: schoolBattleSchool, grade_group: schoolBattleGradeGroup });
-          setHighscoreMode(gameMode); setHighscoreGradeGroup(schoolBattleGradeGroup); const loaded = await refreshSchoolBattleScores(gameMode, schoolBattleGradeGroup); setResultScores(loaded); setScoreMessage(`Du brukte ${formatTime(finalTime)}. ${saveResult.message}`); return;
-        }
-        if (gameType === "school_battle") {
-          const saveResult = await saveSchoolBattleScore({ name: trimmedName.slice(0, 18), score, mode: gameMode, school: schoolBattleSchool });
-          setHighscoreMode(gameMode); const loaded = await refreshSchoolBattleScores(gameMode); setResultScores(loaded); setScoreMessage(`Du fikk ${score} poeng. ${saveResult.message}`); return;
-        }
-        if (isCurrentTimeChallenge) {
-          const saveResult = await saveTimeScore({ name: trimmedName.slice(0, 18), score: finalTime, mode: gameMode, level: gameLevel, grade_level: gameGradeLevel, question_count: gameQuestionCount });
-          setHighscoreMode(gameMode); setHighscoreLevel(gameLevel); setHighscoreGradeLevel(gameGradeLevel); setHighscoreQuestionCount(gameQuestionCount); const loaded = await refreshScores(gameMode, gameLevel, gameGradeLevel, gameQuestionCount); setResultScores(loaded); setScoreMessage(`Du brukte ${formatTime(finalTime)}. ${saveResult.message}`); return;
-        }
-        const saveResult = await saveScore({ name: trimmedName.slice(0, 18), score, mode: gameMode, level: gameLevel, grade_level: gameGradeLevel });
-        setHighscoreMode(gameMode); setHighscoreLevel(gameLevel); setHighscoreGradeLevel(gameGradeLevel); const loaded = await refreshScores(gameMode, gameLevel, gameGradeLevel, gameQuestionCount); setResultScores(loaded); setScoreMessage(`Du fikk ${score} poeng. ${saveResult.message}`);
-      } catch (error) { setScoreMessage(error.message); }
+      const playerResultName = trimmedName.slice(0, 18);
+      if (gameType === "school_battle" && isCurrentTimeChallenge) {
+        const entry = { name: playerResultName, score: finalTime, mode: gameMode, school: schoolBattleSchool, grade_group: schoolBattleGradeGroup, question_count: SCHOOL_BATTLE_TIME_QUESTION_COUNT };
+        await saveRoundHighscore({
+          type: "school_battle_time",
+          entry,
+          baseMessage: `Du brukte ${formatTime(finalTime)}.`,
+          loadScoresForResult: () => loadSchoolBattleScores(gameMode, schoolBattleGradeGroup),
+          loadContext: { ...entry, type: "school_battle_time", game_type: "school_battle" },
+          applyHighscoreContext: () => { setHighscoreMode(gameMode); setHighscoreGradeGroup(schoolBattleGradeGroup); },
+        });
+        return;
+      }
+      if (gameType === "school_battle") {
+        const entry = { name: playerResultName, score: finalScore, mode: gameMode, school: schoolBattleSchool };
+        await saveRoundHighscore({
+          type: "school_battle_score",
+          entry,
+          baseMessage: `Du fikk ${finalScore} poeng.`,
+          loadScoresForResult: () => loadSchoolBattleScores(gameMode),
+          loadContext: { ...entry, type: "school_battle_score", game_type: "school_battle" },
+          applyHighscoreContext: () => { setHighscoreMode(gameMode); },
+        });
+        return;
+      }
+      if (isCurrentTimeChallenge) {
+        const entry = { name: playerResultName, score: finalTime, mode: gameMode, level: gameLevel, grade_level: gameGradeLevel, question_count: gameQuestionCount };
+        await saveRoundHighscore({
+          type: "normal_time",
+          entry,
+          baseMessage: `Du brukte ${formatTime(finalTime)}.`,
+          loadScoresForResult: () => loadScores(gameMode, gameLevel, gameGradeLevel, gameQuestionCount),
+          loadContext: { ...entry, type: "normal_time", game_type: "normal" },
+          applyHighscoreContext: () => { setHighscoreMode(gameMode); setHighscoreLevel(gameLevel); setHighscoreGradeLevel(gameGradeLevel); setHighscoreQuestionCount(gameQuestionCount); },
+        });
+        return;
+      }
+      const entry = { name: playerResultName, score: finalScore, mode: gameMode, level: gameLevel, grade_level: gameGradeLevel };
+      await saveRoundHighscore({
+        type: "normal_score",
+        entry,
+        baseMessage: `Du fikk ${finalScore} poeng.`,
+        loadScoresForResult: () => loadScores(gameMode, gameLevel, gameGradeLevel, gameQuestionCount),
+        loadContext: { ...entry, type: "normal_score", game_type: "normal", question_count: gameQuestionCount },
+        applyHighscoreContext: () => { setHighscoreMode(gameMode); setHighscoreLevel(gameLevel); setHighscoreGradeLevel(gameGradeLevel); },
+      });
     }
   }
 
