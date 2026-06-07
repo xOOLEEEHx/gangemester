@@ -150,7 +150,13 @@ function formatTime(totalSeconds) {
 }
 
 function scrollToTopNow() {
-  setTimeout(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }), 0);
+  if (typeof window === "undefined") return;
+  const scroll = () => window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  setTimeout(() => {
+    scroll();
+    if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(scroll);
+    setTimeout(scroll, 80);
+  }, 0);
 }
 
 function getRandomNormalResultMotivationMessage() {
@@ -1951,6 +1957,10 @@ export default function App() {
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
   }, []);
+
+  useEffect(() => {
+    if (screen === "play" || screen === "bossPlay") scrollToTopNow();
+  }, [screen]);
 
   useEffect(() => {
     if (screen !== "play") return;
