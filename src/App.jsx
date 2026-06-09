@@ -1434,10 +1434,11 @@ function ModeFilterButtons({ selectedMode, onSelect }) {
   return <>{MODE_ORDER.map((mode, index) => <Button key={mode} variant={selectedMode === mode ? "primary" : "light"} onClick={() => onSelect(mode)} className={`full ${index > 0 ? "top-space" : ""}`}>{getModeLabel(mode)}</Button>)}</>;
 }
 
-function Shell({ children, theme = "" }) {
+function Shell({ children, theme = "", isHome = false }) {
   const appThemeClass = theme ? ` app-theme-${theme}` : "";
   const frameThemeClass = theme ? ` theme-frame theme-${theme}` : "";
-  return <main className={`app-shell${appThemeClass}`}><BossBattleStyles /><section className={`phone-frame${frameThemeClass}`}><div className="blob blob-one" /><div className="blob blob-two" /><div className="content">{children}</div></section></main>;
+  const homeFrameClass = isHome ? " home-frame" : "";
+  return <main className={`app-shell${appThemeClass}`}><BossBattleStyles /><section className={`phone-frame${frameThemeClass}${homeFrameClass}`}><div className="blob blob-one" /><div className="blob blob-two" /><div className="content">{children}</div></section></main>;
 }
 
 function BossBattleStyles() {
@@ -2363,7 +2364,7 @@ export default function App() {
 
   if (screen === "home") {
     return (
-      <Shell>
+      <Shell isHome>
         <div className="home-screen">
           <div className="home-arena-bg" aria-hidden="true">
             <span className="home-bg-symbol home-bg-symbol-plus">+</span>
