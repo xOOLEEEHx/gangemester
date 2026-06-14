@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { createClient } from "@supabase/supabase-js";
 import { Crown, Shield, Star, Timer, Trophy, Zap } from "lucide-react";
 
@@ -1730,6 +1731,21 @@ function ModeFilterButtons({ selectedMode, onSelect }) {
   return <>{MODE_ORDER.map((mode, index) => <Button key={mode} variant={selectedMode === mode ? "primary" : "light"} onClick={() => onSelect(mode)} className={`full ${index > 0 ? "top-space" : ""}`}>{getModeLabel(mode)}</Button>)}</>;
 }
 
+function AnnouncementPopup({ title, message, onClose }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="announcement-backdrop" role="dialog" aria-modal="true" aria-labelledby="announcement-title">
+      <div className="announcement-modal">
+        <span className="announcement-kicker">Nyhet</span>
+        <h2 id="announcement-title">{title || ANNOUNCEMENT_DEFAULT_TITLE}</h2>
+        <p>{message}</p>
+        <Button onClick={onClose} className="full">Lukk</Button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function Shell({ children, theme = "", isHome = false, isSetup = false, modeBg = "", frameClassName = "", frameStyle = undefined }) {
   const appThemeClass = theme ? ` app-theme-${theme}` : "";
   const frameThemeClass = theme ? ` theme-frame theme-${theme}` : "";
@@ -3279,17 +3295,14 @@ export default function App() {
             <Button variant="light" onClick={() => setScreen("qr")} className="full">Vis QR-kode</Button>
             <Button variant="light" onClick={() => setScreen("adminLogin")} className="full">Admin</Button>
           </div>
-          {shouldShowAnnouncementPopup && (
-            <div className="announcement-backdrop" role="dialog" aria-modal="true" aria-labelledby="announcement-title">
-              <div className="announcement-modal">
-                <span className="announcement-kicker">Nyhet</span>
-                <h2 id="announcement-title">{activeAnnouncement.title || ANNOUNCEMENT_DEFAULT_TITLE}</h2>
-                <p>{activeAnnouncement.message}</p>
-                <Button onClick={closeAnnouncementPopup} className="full">Lukk</Button>
-              </div>
-            </div>
-          )}
         </div>
+        {shouldShowAnnouncementPopup && (
+          <AnnouncementPopup
+            title={activeAnnouncement.title}
+            message={activeAnnouncement.message}
+            onClose={closeAnnouncementPopup}
+          />
+        )}
       </Shell>
     );
   }
